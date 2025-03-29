@@ -131,6 +131,32 @@
       background-color: #e8f5e9;
     }
     
+    /* Clone indicators */
+    .pcar-slides[data-slide-type="clone-start"]::before,
+    .pcar-slides[data-slide-type="clone-end"]::before {
+      content: "Clone";
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(255, 0, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    .pcar-slides[data-slide-type="real"]::before {
+      content: "Real";
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0, 128, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
     /* Status indicator */
     .status-indicator {
       margin-top: 10px;
@@ -278,12 +304,27 @@
         document.getElementById('infinite-offset').textContent = carouselData.realSlidesOffset || 0;
         document.getElementById('infinite-total').textContent = carouselData.slides.length;
         
-        // Highlight the active slide
-        document.querySelectorAll('#infinite-carousel .pcar-slides').forEach((slide, index) => {
-          if (index === carouselData.currentIndex) {
-            slide.classList.add('active');
+        // Highlight the active slide(s)
+        const slides = document.querySelectorAll('#infinite-carousel .pcar-slides');
+        slides.forEach((slide, index) => {
+          // Remove active class from all slides first
+          slide.classList.remove('active');
+        });
+        
+        // Add active class to current slide
+        if (slides[carouselData.currentIndex]) {
+          slides[carouselData.currentIndex].classList.add('active');
+        }
+        
+        // For debugging - highlight real vs. cloned slides
+        slides.forEach((slide, index) => {
+          // Add data attribute to help visualize real vs. cloned slides
+          if (index < carouselData.realSlidesOffset) {
+            slide.setAttribute('data-slide-type', 'clone-start');
+          } else if (index >= carouselData.realSlidesOffset + carouselData.totalSlides) {
+            slide.setAttribute('data-slide-type', 'clone-end');
           } else {
-            slide.classList.remove('active');
+            slide.setAttribute('data-slide-type', 'real');
           }
         });
       }
@@ -317,6 +358,12 @@
         // Allow time for animation to complete
         setTimeout(updateStatus, 350);
       });
+    });
+    
+    // Listen for custom slide change events (for drag updates)
+    document.addEventListener('pcarousel:slideChanged', (event) => {
+      // Allow time for animation to complete
+      setTimeout(updateStatus, 350);
     });
     
     // Handle configuration updates

@@ -454,6 +454,12 @@ class PCarousel {
       }
       
       isDragging = false;
+      
+      // Trigger a custom event for external status updates
+      const event = new CustomEvent('pcarousel:slideChanged', { 
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      });
+      document.dispatchEvent(event);
     };
     
     // Add event listeners for touch devices
@@ -550,6 +556,12 @@ class PCarousel {
     // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
+      
+      // Trigger a custom event for external status updates
+      const event = new CustomEvent('pcarousel:slideChanged', { 
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      });
+      document.dispatchEvent(event);
     }, this.config.speed);
     
     return this;
@@ -602,6 +614,12 @@ class PCarousel {
     // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
+      
+      // Trigger a custom event for external status updates
+      const event = new CustomEvent('pcarousel:slideChanged', { 
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      });
+      document.dispatchEvent(event);
     }, this.config.speed);
     
     return this;
@@ -649,6 +667,12 @@ class PCarousel {
       if (carouselData.isInfinite) {
         this._checkInfiniteLoopReset(carouselData);
       }
+      
+      // Trigger a custom event for external status updates
+      const event = new CustomEvent('pcarousel:slideChanged', { 
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      });
+      document.dispatchEvent(event);
     }, this.config.speed);
     
     return this;

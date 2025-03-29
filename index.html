@@ -49,6 +49,7 @@
       align-items: center;
       justify-content: center;
       font-size: 24px;
+      position: relative;
     }
     
     /* Navigation buttons */
@@ -98,7 +99,7 @@
       border-radius: 4px;
     }
     
-    .update-config-btn {
+    .update-config-btn, .go-to-slide-btn {
       padding: 10px 20px;
       background-color: #2196F3;
       color: white;
@@ -106,10 +107,10 @@
       border-radius: 4px;
       cursor: pointer;
       display: block;
-      margin: 0 auto;
+      margin: 10px auto;
     }
     
-    .update-config-btn:hover {
+    .update-config-btn:hover, .go-to-slide-btn:hover {
       background-color: #0b7dda;
     }
     
@@ -166,6 +167,24 @@
       font-size: 14px;
       text-align: center;
     }
+    
+    /* SlideTo Test Panel */
+    .slide-to-panel {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #eee;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .slide-to-panel input {
+      width: 60px;
+      padding: 5px;
+      margin-right: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -191,6 +210,13 @@
           Current Index: <span id="infinite-index">0</span> | 
           Real Slides Offset: <span id="infinite-offset">0</span> |
           Total Slides (with clones): <span id="infinite-total">0</span>
+        </div>
+        
+        <!-- SlideTo Test Panel -->
+        <div class="slide-to-panel">
+          <label for="slide-to-input">Go To Slide (zero-based index):</label>
+          <input type="number" id="slide-to-input" value="0" min="0">
+          <button class="go-to-slide-btn" id="go-to-slide-btn">Go</button>
         </div>
       </div>
       
@@ -394,6 +420,15 @@
       setTimeout(updateStatus, 100);
       
       alert('Configuration updated successfully!');
+    });
+    
+    // Handle the slideTo test button
+    document.getElementById('go-to-slide-btn').addEventListener('click', () => {
+      const inputVal = document.getElementById('slide-to-input').value;
+      const targetIndex = parseInt(inputVal, 10);
+      if (!isNaN(targetIndex)) {
+        infiniteCarousel.slideTo('#infinite-carousel', targetIndex);
+      }
     });
   </script>
 </body>

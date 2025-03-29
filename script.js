@@ -76,11 +76,17 @@ class PCarousel {
       return;
     }
     
+    // Convert NodeList to Array and assign an index attribute to each real slide
+    const originalSlides = Array.from(slides).map((slide, index) => {
+      slide.setAttribute('data-pcar-index', index);
+      return slide;
+    });
+    
     const carouselData = {
       container,
       wrapper,
       slides: Array.from(slides),
-      originalSlides: Array.from(slides), // Store original slides for reference
+      originalSlides, // Store original slides for reference
       currentIndex: 0,
       isInfinite: this.config.infiniteLoop,
       clonedSlides: [], // Track cloned slides
@@ -374,6 +380,12 @@ class PCarousel {
     
     // Touch/Mouse start
     const handleDragStart = (e) => {
+      // Allow interactive elements (input, button, select, textarea) to work normally
+      const targetTag = e.target.tagName.toLowerCase();
+      if (['input', 'button', 'select', 'textarea'].includes(targetTag)) {
+        return;
+      }
+      
       e.preventDefault();
       startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
       isDragging = true;
@@ -482,6 +494,7 @@ class PCarousel {
       handleDragEnd
     };
   }
+  
 
   /**
    * Handle window resize event
@@ -628,10 +641,11 @@ class PCarousel {
   /**
    * Go to a specific slide
    * @param {HTMLElement|string} container - Container element or selector
-   * @param {number} index - Target slide index
+   * @param {number} index - Target slide index (zero-based for real slides)
    * @returns {PCarousel} - Returns the carousel instance for chaining
    */
   goTo(container, index) {
+    // Existing goTo implementation...
     const carouselData = this._getCarouselData(container);
     
     if (!carouselData || carouselData.isAnimating) return this;
@@ -669,6 +683,61 @@ class PCarousel {
       }
       
       // Trigger a custom event for external status updates
+      const event = new CustomEvent('pcarousel:slideChanged', { 
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      });
+      document.dispatchEvent(event);
+    }, this.config.speed);
+    
+    return this;
+  }
+  
+  /**
+   * Slide to a specific slide by index (zero-based index for real slides)
+   * This new method ensures the target main slide becomes active and appears first.
+   * It works seamlessly in both standard and infinite loop modes.
+   * @param {HTMLElement|string} container - Container element or selector
+   * @param {number} index - Zero-based index of the main (real) slide to activate
+   * @returns {PCarousel} - Returns the carousel instance for chaining
+   */
+  slideTo(container, index) {
+
+    if (typeof container === 'number') {
+      index = container;
+      container = this.state.carousels[0].container;
+    }
+
+    const carouselData = this._getCarouselData(container);
+    if (!carouselData || carouselData.isAnimating) return this;
+    
+    carouselData.isAnimating = true;
+    
+    // Clamp the target index within the bounds of real slides
+    const totalRealSlides = carouselData.totalSlides;
+    const targetRealIndex = Math.max(0, Math.min(index, totalRealSlides - 1));
+    
+    // For infinite mode, adjust the target index by the realSlidesOffset
+    let targetIndex = targetRealIndex;
+    if (carouselData.isInfinite) {
+      targetIndex = targetRealIndex + carouselData.realSlidesOffset;
+    }
+    
+    // Set the current index to the computed target index
+    carouselData.currentIndex = targetIndex;
+    
+    // Animate to the new position
+    this._positionSlides(carouselData);
+    
+    // For infinite mode, check if a reset is needed after the transition
+    if (carouselData.isInfinite) {
+      setTimeout(() => {
+        this._checkInfiniteLoopReset(carouselData);
+      }, this.config.speed);
+    }
+    
+    // After transition completes, clear the animating flag and dispatch the event
+    setTimeout(() => {
+      carouselData.isAnimating = false;
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });

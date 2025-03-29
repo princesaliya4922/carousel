@@ -1,19 +1,18 @@
 /**
- * PCarousel - A customizable carousel library
- * Enhanced with infiniteLoop and built-in tabs support functionality.
+ * Swipix - A customizable carousel library
+ * Enhanced with infiniteLoop, built-in tabs support, and range-mapped tabs.
  */
-class PCarousel {
+class Swipix {
   /**
    * Create a new carousel instance
    * @param {Object} config - Configuration options
-   * @param {string} config.container - Selector for the carousel container
+   * @param {string} config.container - Selector for the carousel container (default: '.pix-container')
    * @param {string|null} config.nextButton - Selector for next button (null for no button)
    * @param {string|null} config.prevButton - Selector for previous button (null for no button)
    * @param {boolean} config.loop - Enable standard looping (has no effect when infiniteLoop is true)
    * @param {boolean} config.infiniteLoop - Enable true infinite sliding with cloned slides
    * @param {number} config.speed - Transition speed in milliseconds
-   * @param {Object} config.slidesPerView - Number of slides to show based on viewport
-   *    Example: { default: 1, 768: 2, 1024: 3 }
+   * @param {Object} config.slidesPerView - Number of slides to show based on viewport (e.g., { default: 1, 768: 2, 1024: 3 })
    * @param {number} config.gap - Gap between slides in pixels
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
    * @param {Object} [config.tabsConfig] - Optional configuration for tab buttons
@@ -21,14 +20,15 @@ class PCarousel {
    *    {
    *      container: '.tabs-container',
    *      buttonSelector: '.tab-btn', // optional
-   *      mapping: [0, 2, 1, 3],        // optional, maps button order to slide index
-   *      activeClass: 'active'         // optional
+   *      mapping: [0, 4],            // optional (with rangeMapping, mapping array sets thresholds)
+   *      rangeMapping: true,         // optional: if true, mapping values are treated as thresholds
+   *      activeClass: 'active'       // optional
    *    }
    */
   constructor(config) {
     // Default configuration
     this.config = {
-      container: '.pcar-container',
+      container: '.pix-container',
       nextButton: null,
       prevButton: null,
       loop: false,
@@ -55,7 +55,7 @@ class PCarousel {
   /**
    * Initialize the carousel
    * @param {string} containerSelector - Optional container selector to override config
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   init(containerSelector = null) {
     const selector = containerSelector || this.config.container;
@@ -76,17 +76,17 @@ class PCarousel {
    * @private
    */
   _initSingleCarousel(container) {
-    const wrapper = container.querySelector('.pcar-wrapper');
-    const slides = container.querySelectorAll('.pcar-slides');
+    const wrapper = container.querySelector('.pix-wrapper');
+    const slides = container.querySelectorAll('.pix-slide');
     
     if (!wrapper || slides.length === 0) {
-      console.error('Carousel structure is invalid. Make sure you have .pcar-wrapper and .pcar-slides elements.');
+      console.error('Carousel structure is invalid. Make sure you have .pix-wrapper and .pix-slide elements.');
       return;
     }
     
     // Convert NodeList to Array and assign an index attribute to each real slide
     const originalSlides = Array.from(slides).map((slide, index) => {
-      slide.setAttribute('data-pcar-index', index);
+      slide.setAttribute('data-swipix-index', index);
       return slide;
     });
     
@@ -163,7 +163,6 @@ class PCarousel {
           console.warn(`Mapping for tab index ${index} is out-of-bound.`);
           return;
         }
-        // If multiple carousels exist, use container from carouselData
         this.slideTo(carouselData.container, targetSlide);
       });
     });
@@ -173,54 +172,51 @@ class PCarousel {
   }
 
   /**
- * Update the active state of tab buttons based on the current slide
- * @param {Object} carouselData - Data for a specific carousel
- * @private
- */
-_updateTabsActive(carouselData) {
-  if (!carouselData.tabsConfig || !carouselData.tabButtons) return;
-  
-  let activeIndex = carouselData.currentIndex;
-  if (carouselData.isInfinite) {
-    activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
-  }
-  activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
-  
-  const tabsConf = carouselData.tabsConfig;
-  const activeClass = tabsConf.activeClass || 'active';
-  
-  // New: Check if rangeMapping is enabled
-  if (tabsConf.rangeMapping && Array.isArray(tabsConf.mapping) && tabsConf.mapping.length > 0) {
-    // Use the mapping thresholds: for each tab, mapping[i] is the minimum slide index for that tab
-    let selectedTab = 0;
-    for (let i = 0; i < tabsConf.mapping.length; i++) {
-      if (activeIndex >= tabsConf.mapping[i]) {
-        selectedTab = i;
-      }
+   * Update the active state of tab buttons based on the current slide
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _updateTabsActive(carouselData) {
+    if (!carouselData.tabsConfig || !carouselData.tabButtons) return;
+    
+    let activeIndex = carouselData.currentIndex;
+    if (carouselData.isInfinite) {
+      activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
     }
-    // Update buttons: selectedTab becomes active.
-    carouselData.tabButtons.forEach((btn, i) => {
-      if (i === selectedTab) {
-        btn.classList.add(activeClass);
-      } else {
-        btn.classList.remove(activeClass);
+    activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
+    
+    const tabsConf = carouselData.tabsConfig;
+    const activeClass = tabsConf.activeClass || 'active';
+    
+    // If rangeMapping is enabled, use mapping thresholds to determine active tab.
+    if (tabsConf.rangeMapping && Array.isArray(tabsConf.mapping) && tabsConf.mapping.length > 0) {
+      let selectedTab = 0;
+      for (let i = 0; i < tabsConf.mapping.length; i++) {
+        if (activeIndex >= tabsConf.mapping[i]) {
+          selectedTab = i;
+        }
       }
-    });
-  } else {
-    // Default (non-range): either use mapping equality or identity mapping.
-    carouselData.tabButtons.forEach((btn, i) => {
-      let mappedSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
-                        ? tabsConf.mapping[i]
-                        : i;
-      if (mappedSlide === activeIndex) {
-        btn.classList.add(activeClass);
-      } else {
-        btn.classList.remove(activeClass);
-      }
-    });
+      carouselData.tabButtons.forEach((btn, i) => {
+        if (i === selectedTab) {
+          btn.classList.add(activeClass);
+        } else {
+          btn.classList.remove(activeClass);
+        }
+      });
+    } else {
+      // Default (non-range): either use mapping equality or identity mapping.
+      carouselData.tabButtons.forEach((btn, i) => {
+        let mappedSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
+                          ? tabsConf.mapping[i]
+                          : i;
+        if (mappedSlide === activeIndex) {
+          btn.classList.add(activeClass);
+        } else {
+          btn.classList.remove(activeClass);
+        }
+      });
+    }
   }
-}
-
 
   /**
    * Setup infinite loop by cloning slides and positioning them
@@ -233,11 +229,8 @@ _updateTabsActive(carouselData) {
     // Clear any existing clones to avoid duplicates
     this._clearClonedSlides(carouselData);
     
-    // Determine the maximum slides per view from breakpoints
     const breakpointValues = Object.values(this.config.slidesPerView);
     const maxSlidesPerView = Math.max(...breakpointValues);
-    
-    // Clone count: at least maxSlidesPerView plus slidesToMove buffer
     const cloneCount = maxSlidesPerView + this.config.slidesToMove;
     
     // Clone beginning slides and append to the end
@@ -245,8 +238,8 @@ _updateTabsActive(carouselData) {
     for (let i = 0; i < cloneCount; i++) {
       const slideIndex = i % originalSlides.length;
       const clone = originalSlides[slideIndex].cloneNode(true);
-      clone.setAttribute('data-pcar-clone', 'end');
-      clone.setAttribute('data-pcar-original-index', slideIndex);
+      clone.setAttribute('data-swipix-clone', 'end');
+      clone.setAttribute('data-swipix-original-index', slideIndex);
       wrapper.appendChild(clone);
       beginClones.push(clone);
     }
@@ -256,19 +249,15 @@ _updateTabsActive(carouselData) {
     for (let i = 0; i < cloneCount; i++) {
       const slideIndex = (originalSlides.length - 1 - i) % originalSlides.length;
       const clone = originalSlides[slideIndex].cloneNode(true);
-      clone.setAttribute('data-pcar-clone', 'start');
-      clone.setAttribute('data-pcar-original-index', slideIndex);
+      clone.setAttribute('data-swipix-clone', 'start');
+      clone.setAttribute('data-swipix-original-index', slideIndex);
       wrapper.insertBefore(clone, wrapper.firstChild);
       endClones.push(clone);
     }
     
     carouselData.clonedSlides = [...endClones, ...beginClones];
     carouselData.realSlidesOffset = endClones.length;
-    
-    // Update slides array to include clones
-    carouselData.slides = Array.from(wrapper.querySelectorAll('.pcar-slides'));
-    
-    // Set initial position to the first real slide
+    carouselData.slides = Array.from(wrapper.querySelectorAll('.pix-slide'));
     carouselData.currentIndex = carouselData.realSlidesOffset;
   }
 
@@ -335,10 +324,8 @@ _updateTabsActive(carouselData) {
     
     carouselData.slidesPerView = slidesPerView;
     carouselData.containerWidth = container.offsetWidth;
-    
     const totalGapSpace = this.config.gap * (slidesPerView - 1);
     carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
-    
     carouselData.totalSlides = carouselData.originalSlides.length;
     
     slides.forEach(slide => {
@@ -346,11 +333,9 @@ _updateTabsActive(carouselData) {
     });
     
     carouselData.gap = this.config.gap;
-    
     if (carouselData.isInfinite) {
       this._setupInfiniteLoop(carouselData);
     }
-    
     this._positionSlides(carouselData);
   }
 
@@ -372,10 +357,8 @@ _updateTabsActive(carouselData) {
    */
   _checkInfiniteLoopReset(carouselData) {
     if (!carouselData.isInfinite) return;
-    
     const { currentIndex, realSlidesOffset, totalSlides, wrapper } = carouselData;
     const endThreshold = realSlidesOffset + totalSlides;
-    
     if (currentIndex < realSlidesOffset) {
       wrapper.style.transition = 'none';
       carouselData.currentIndex = endThreshold - (realSlidesOffset - currentIndex);
@@ -428,9 +411,7 @@ _updateTabsActive(carouselData) {
     
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
-      if (['input', 'button', 'select', 'textarea'].includes(targetTag)) {
-        return;
-      }
+      if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
       e.preventDefault();
       startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
       isDragging = true;
@@ -446,15 +427,10 @@ _updateTabsActive(carouselData) {
       moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
       const diff = moveX - startX;
       let adjustedDiff = diff;
-      
       if (!carouselData.isInfinite && !this.config.loop) {
         const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-        if (carouselData.currentIndex === 0 && diff > 0) {
-          adjustedDiff = diff * 0.3;
-        }
-        if (carouselData.currentIndex === maxIndex && diff < 0) {
-          adjustedDiff = diff * 0.3;
-        }
+        if (carouselData.currentIndex === 0 && diff > 0) adjustedDiff = diff * 0.3;
+        if (carouselData.currentIndex === maxIndex && diff < 0) adjustedDiff = diff * 0.3;
       }
       wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
     };
@@ -468,7 +444,6 @@ _updateTabsActive(carouselData) {
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
       const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
       const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
-      
       if (Math.abs(diff) > 50) {
         if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
           this.prev(container);
@@ -480,9 +455,8 @@ _updateTabsActive(carouselData) {
       } else {
         this._positionSlides(carouselData);
       }
-      
       isDragging = false;
-      const event = new CustomEvent('pcarousel:slideChanged', { 
+      const event = new CustomEvent('swipix:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
@@ -528,14 +502,13 @@ _updateTabsActive(carouselData) {
   /**
    * Move to the next slide
    * @param {HTMLElement|string} container - Container element or selector
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   next(container) {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
     carouselData.isAnimating = true;
     const slidesToMove = this.config.slidesToMove;
-    
     if (carouselData.isInfinite) {
       carouselData.currentIndex += slidesToMove;
     } else {
@@ -552,37 +525,33 @@ _updateTabsActive(carouselData) {
         carouselData.currentIndex += slidesToMove;
       }
     }
-    
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
       setTimeout(() => {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
-    
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('pcarousel:slideChanged', { 
+      const event = new CustomEvent('swipix:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
     }, this.config.speed);
-    
     return this;
   }
 
   /**
    * Move to the previous slide
    * @param {HTMLElement|string} container - Container element or selector
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   prev(container) {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
     carouselData.isAnimating = true;
     const slidesToMove = this.config.slidesToMove;
-    
     if (carouselData.isInfinite) {
       carouselData.currentIndex -= slidesToMove;
     } else {
@@ -598,23 +567,20 @@ _updateTabsActive(carouselData) {
         carouselData.currentIndex -= slidesToMove;
       }
     }
-    
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
       setTimeout(() => {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
-    
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('pcarousel:slideChanged', { 
+      const event = new CustomEvent('swipix:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
     }, this.config.speed);
-    
     return this;
   }
 
@@ -622,7 +588,7 @@ _updateTabsActive(carouselData) {
    * Go to a specific slide by index (zero-based for real slides)
    * @param {HTMLElement|string} container - Container element or selector
    * @param {number} index - Target slide index (zero-based for real slides)
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   goTo(container, index) {
     const carouselData = this._getCarouselData(container);
@@ -633,7 +599,6 @@ _updateTabsActive(carouselData) {
     if (carouselData.isInfinite) {
       targetIndex = index + carouselData.realSlidesOffset;
     }
-    
     if (targetIndex < (carouselData.isInfinite ? carouselData.realSlidesOffset : 0)) {
       carouselData.currentIndex = carouselData.isInfinite ? carouselData.realSlidesOffset : 0;
     } else if (targetIndex > (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex)) {
@@ -641,7 +606,6 @@ _updateTabsActive(carouselData) {
     } else {
       carouselData.currentIndex = targetIndex;
     }
-    
     this._positionSlides(carouselData);
     setTimeout(() => {
       carouselData.isAnimating = false;
@@ -649,12 +613,11 @@ _updateTabsActive(carouselData) {
         this._checkInfiniteLoopReset(carouselData);
       }
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('pcarousel:slideChanged', { 
+      const event = new CustomEvent('swipix:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
     }, this.config.speed);
-    
     return this;
   }
   
@@ -662,26 +625,22 @@ _updateTabsActive(carouselData) {
    * Slide to a specific slide by index (zero-based for real slides)
    * @param {HTMLElement|string|number} container - Container element/selector or index if single carousel
    * @param {number} [index] - Target slide index if container is provided
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   slideTo(container, index) {
-    // Allow calling slideTo with just an index if there's only one carousel
     if (typeof container === 'number') {
       index = container;
       container = this.state.carousels[0].container;
     }
-    
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
     carouselData.isAnimating = true;
-    
     const totalRealSlides = carouselData.totalSlides;
     const targetRealIndex = Math.max(0, Math.min(index, totalRealSlides - 1));
     let targetIndex = targetRealIndex;
     if (carouselData.isInfinite) {
       targetIndex = targetRealIndex + carouselData.realSlidesOffset;
     }
-    
     carouselData.currentIndex = targetIndex;
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
@@ -689,23 +648,21 @@ _updateTabsActive(carouselData) {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
-    
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('pcarousel:slideChanged', { 
+      const event = new CustomEvent('swipix:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
     }, this.config.speed);
-    
     return this;
   }
 
   /**
    * Update carousel configuration
    * @param {Object} newConfig - New configuration options
-   * @returns {PCarousel} - Returns the carousel instance for chaining
+   * @returns {Swipix} - Returns the carousel instance for chaining
    */
   updateConfig(newConfig) {
     const oldConfig = { ...this.config };
@@ -731,7 +688,6 @@ _updateTabsActive(carouselData) {
       this._applyStyles(carouselData);
       this._calculateDimensions(carouselData);
       
-      // Reinitialize tabs if tabsConfig is provided
       if (this.config.tabsConfig && this.config.tabsConfig.container) {
         this._initTabs(carouselData);
       }
@@ -777,9 +733,9 @@ _updateTabsActive(carouselData) {
   }
 }
 
-// Export the carousel class
+// Export the library
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = PCarousel;
+  module.exports = Swipix;
 } else {
-  window.PCarousel = PCarousel;
+  window.Swipix = Swipix;
 }

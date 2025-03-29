@@ -231,7 +231,7 @@ class Swipix {
     
     const breakpointValues = Object.values(this.config.slidesPerView);
     const maxSlidesPerView = Math.max(...breakpointValues);
-    const cloneCount = maxSlidesPerView + this.config.slidesToMove;
+    const cloneCount = maxSlidesPerView;
     
     // Clone beginning slides and append to the end
     const beginClones = [];

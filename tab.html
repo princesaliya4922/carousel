@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCarousel with Range-Mapped Tabs Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    /* Tabs container styling */
+    .tabs-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .tabs-container .tab-btn {
+      padding: 10px 20px;
+      background: #ddd;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .tabs-container .tab-btn.active {
+      background: #2196F3;
+      color: #fff;
+    }
+    /* Carousel styling */
+    .pcar-container {
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 15px;
+    }
+    .pcar-wrapper {
+      display: flex;
+      transition: transform 300ms ease;
+      will-change: transform;
+    }
+    .pcar-slides {
+      flex-shrink: 0;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      position: relative;
+    }
+    /* Slide number overlay for clarity */
+    .slide-number {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    /* Navigation buttons */
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .carousel-btn {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .carousel-btn:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PCarousel with Range-Mapped Tabs Demo</h1>
+    
+    <!-- Tabs Container with 2 Buttons -->
+    <div class="tabs-container">
+      <button class="tab-btn">Tab 1 (Slides 0-3)</button>
+      <button class="tab-btn">Tab 2 (Slides 4+)</button>
+    </div>
+    
+    <!-- Carousel Container with 4 Slides -->
+    <div class="pcar-container" id="carousel-demo">
+      <div class="pcar-wrapper">
+        <div class="pcar-slides">Slide 1<div class="slide-number">1</div></div>
+        <div class="pcar-slides">Slide 2<div class="slide-number">2</div></div>
+        <div class="pcar-slides">Slide 3<div class="slide-number">3</div></div>
+        <div class="pcar-slides">Slide 4<div class="slide-number">4</div></div>
+      </div>
+    </div>
+    
+    <!-- Navigation Buttons -->
+    <div class="carousel-nav">
+      <button class="carousel-btn prev-btn">Previous</button>
+      <button class="carousel-btn next-btn">Next</button>
+    </div>
+  </div>
+  
+  <!-- Import the updated PCarousel Library -->
+  <script src="script.js"></script>
+  <script>
+    // Initialize the carousel with rangeMapping enabled.
+    // Here, slidesPerView is set to 3 for demonstration purposes.
+    // There are 4 slides and 2 tabs. The mapping [0, 4] means:
+    // - Tab 1 is active when active slide index is between 0 and 3.
+    // - Tab 2 becomes active when the active slide is 4 or greater.
+    const carouselInstance = new PCarousel({
+      container: '#carousel-demo',
+      nextButton: '.next-btn',
+      prevButton: '.prev-btn',
+      loop: false,
+      infiniteLoop: true,
+      speed: 300,
+      slidesPerView: { default: 3 },
+      gap: 0,
+      slidesToMove: 1,
+      tabsConfig: {
+        container: '.tabs-container',
+        buttonSelector: '.tab-btn',
+        mapping: [0, 2],
+        rangeMapping: true,
+        activeClass: 'active'
+      }
+    }).init();
+  </script>
+</body>
+</html>

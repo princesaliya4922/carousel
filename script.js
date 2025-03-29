@@ -221,58 +221,117 @@ class PCarousel {
   }
 
   /**
-   * Initialize touch events for swipe functionality
+   * Initialize touch and mouse drag events for swipe functionality
    * @param {Object} carouselData - Data for a specific carousel
    * @private
    */
   _initTouchEvents(carouselData) {
     const { container, wrapper } = carouselData;
-    let startX, moveX, touchStarted = false;
+    let startX, moveX, isDragging = false;
+    let initialTransform = 0;
     
-    // Touch start
-    container.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX;
-      touchStarted = true;
+    // Touch/Mouse start
+    const handleDragStart = (e) => {
+      e.preventDefault();
+      startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+      isDragging = true;
       
-      // Disable transition during touch
+      // Store the current transform value
+      const transform = window.getComputedStyle(wrapper).getPropertyValue('transform');
+      const matrix = new DOMMatrix(transform);
+      initialTransform = matrix.m41; // Get the X translation value
+      
+      // Disable transition during drag
       wrapper.style.transition = 'none';
-    }, { passive: true });
-    
-    // Touch move
-    container.addEventListener('touchmove', (e) => {
-      if (!touchStarted) return;
       
-      moveX = e.touches[0].clientX;
+      // Add cursor styling for better UX
+      wrapper.style.cursor = 'grabbing';
+    };
+    
+    // Touch/Mouse move
+    const handleDragMove = (e) => {
+      if (!isDragging) return;
+      
+      moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
       const diff = moveX - startX;
       
-      // Get current transform value
-      const currentTransform = carouselData.currentIndex * carouselData.slideWidth;
-      wrapper.style.transform = `translateX(${-currentTransform + diff}px)`;
-    }, { passive: true });
+      // Determine boundaries based on loop mode
+      let adjustedDiff = diff;
+      
+      if (!this.config.loop) {
+        const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+        
+        // Restrict dragging past the first slide (left boundary)
+        if (carouselData.currentIndex === 0 && diff > 0) {
+          adjustedDiff = diff * 0.3; // Apply resistance effect
+        }
+        
+        // Restrict dragging past the last slide (right boundary)
+        if (carouselData.currentIndex === maxIndex && diff < 0) {
+          adjustedDiff = diff * 0.3; // Apply resistance effect
+        }
+      }
+      
+      // Apply the translation with boundary limits
+      wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
+    };
     
-    // Touch end
-    container.addEventListener('touchend', () => {
-      if (!touchStarted) return;
+    // Touch/Mouse end
+    const handleDragEnd = (e) => {
+      if (!isDragging) return;
       
       // Re-enable transition
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
+      wrapper.style.cursor = 'grab';
       
-      const diff = moveX - startX;
+      const endX = e.type === 'touchend' ? 
+        (e.changedTouches ? e.changedTouches[0].clientX : moveX) : 
+        e.clientX || moveX;
       
-      // If swipe distance is enough, move to next or previous
+      const diff = endX - startX;
+      
+      // Check if we're at a boundary and not in loop mode
+      const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+      const isAtStart = carouselData.currentIndex === 0;
+      const isAtEnd = carouselData.currentIndex === maxIndex;
+      
+      // If swipe distance is enough and we're not at a boundary (or we're in loop mode)
       if (Math.abs(diff) > 50) {
-        if (diff > 0) {
+        if (diff > 0 && (!isAtStart || this.config.loop)) {
           this.prev(container);
-        } else {
+        } else if (diff < 0 && (!isAtEnd || this.config.loop)) {
           this.next(container);
+        } else {
+          // Reset to current position if we're at a boundary and not in loop mode
+          this._positionSlides(carouselData);
         }
       } else {
-        // Reset to current position
+        // Reset to current position for small movements
         this._positionSlides(carouselData);
       }
       
-      touchStarted = false;
-    });
+      isDragging = false;
+    };
+    
+    // Add event listeners for touch devices
+    container.addEventListener('touchstart', handleDragStart, { passive: false });
+    container.addEventListener('touchmove', handleDragMove, { passive: true });
+    container.addEventListener('touchend', handleDragEnd);
+    
+    // Add event listeners for mouse drag
+    container.addEventListener('mousedown', handleDragStart);
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    
+    // Add initial grab cursor
+    wrapper.style.cursor = 'grab';
+    
+    // Store event handlers for cleanup in destroy method
+    carouselData.eventHandlers = {
+      handleDragStart,
+      handleDragMove,
+      handleDragEnd
+    };
   }
 
   /**
@@ -441,7 +500,7 @@ class PCarousel {
     window.removeEventListener('resize', this._handleResize.bind(this));
     
     this.state.carousels.forEach(carouselData => {
-      const { container, wrapper, slides } = carouselData;
+      const { container, wrapper, slides, eventHandlers } = carouselData;
       
       // Remove styles
       container.style.overflow = '';
@@ -451,13 +510,25 @@ class PCarousel {
       wrapper.style.transition = '';
       wrapper.style.transform = '';
       wrapper.style.willChange = '';
+      wrapper.style.cursor = '';
       
       slides.forEach(slide => {
         slide.style.flexShrink = '';
         slide.style.width = '';
       });
       
-      // Remove event listeners (this is a simplified approach)
+      // Properly remove event listeners if available
+      if (eventHandlers) {
+        container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: false });
+        container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: true });
+        container.removeEventListener('touchend', eventHandlers.handleDragEnd);
+        
+        container.removeEventListener('mousedown', eventHandlers.handleDragStart);
+        window.removeEventListener('mousemove', eventHandlers.handleDragMove);
+        window.removeEventListener('mouseup', eventHandlers.handleDragEnd);
+      }
+      
+      // For other event listeners that might not be tracked
       const newContainer = container.cloneNode(true);
       container.parentNode.replaceChild(newContainer, container);
     });

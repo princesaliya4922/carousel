@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCarousel Demo</title>
+  <title>PCarousel Infinite Loop Demo</title>
   <style>
     * {
       box-sizing: border-box;
@@ -112,15 +112,69 @@
     .update-config-btn:hover {
       background-color: #0b7dda;
     }
+    
+    /* Slide numbers for demo */
+    .slide-number {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    /* Active slide indicator */
+    .pcar-slides.active {
+      border: 2px solid #4CAF50;
+      background-color: #e8f5e9;
+    }
+    
+    /* Clone indicators */
+    .pcar-slides[data-slide-type="clone-start"]::before,
+    .pcar-slides[data-slide-type="clone-end"]::before {
+      content: "Clone";
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(255, 0, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    .pcar-slides[data-slide-type="real"]::before {
+      content: "Real";
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0, 128, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    /* Status indicator */
+    .status-indicator {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>PCarousel Demo</h1>
+    <h1>PCarousel Infinite Loop Demo</h1>
     
     <section class="carousel-section">
-      <h2>Basic Carousel</h2>
-      <div class="pcar-container" id="basic-carousel">
+      <h2>Infinite Loop Carousel</h2>
+      <div class="pcar-container" id="infinite-carousel">
         <div class="pcar-wrapper">
           <div class="pcar-slides">Slide 1</div>
           <div class="pcar-slides">Slide 2</div>
@@ -133,12 +187,24 @@
           <button class="carousel-btn prev-btn">Previous</button>
           <button class="carousel-btn next-btn">Next</button>
         </div>
+        <div class="status-indicator" id="infinite-status">
+          Current Index: <span id="infinite-index">0</span> | 
+          Real Slides Offset: <span id="infinite-offset">0</span> |
+          Total Slides (with clones): <span id="infinite-total">0</span>
+        </div>
       </div>
       
       <div class="config-panel">
         <h3>Configuration</h3>
         <div class="config-group">
-          <label for="loop-mode">Loop Mode:</label>
+          <label for="infinite-mode">Infinite Loop Mode:</label>
+          <select id="infinite-mode">
+            <option value="true" selected>Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="config-group">
+          <label for="loop-mode">Standard Loop Mode (used when infinite loop is disabled):</label>
           <select id="loop-mode">
             <option value="true">Enabled</option>
             <option value="false" selected>Disabled</option>
@@ -162,7 +228,7 @@
         </div>
         <div class="config-group">
           <label for="slide-gap">Gap Between Slides (px):</label>
-          <input type="number" id="slide-gap" value="0" min="0" max="50">
+          <input type="number" id="slide-gap" value="10" min="0" max="50">
         </div>
         <div class="config-group">
           <label for="slides-to-move">Slides to Move per Click:</label>
@@ -173,20 +239,19 @@
     </section>
     
     <section class="carousel-section">
-      <h2>Multiple Carousels with Same Configuration</h2>
-      <div class="pcar-container multiple-carousel">
+      <h2>Standard Carousel (for Comparison)</h2>
+      <div class="pcar-container" id="standard-carousel">
         <div class="pcar-wrapper">
-          <div class="pcar-slides">Carousel 2 - Slide 1</div>
-          <div class="pcar-slides">Carousel 2 - Slide 2</div>
-          <div class="pcar-slides">Carousel 2 - Slide 3</div>
+          <div class="pcar-slides">Slide 1</div>
+          <div class="pcar-slides">Slide 2</div>
+          <div class="pcar-slides">Slide 3</div>
+          <div class="pcar-slides">Slide 4</div>
+          <div class="pcar-slides">Slide 5</div>
+          <div class="pcar-slides">Slide 6</div>
         </div>
-      </div>
-      
-      <div class="pcar-container multiple-carousel">
-        <div class="pcar-wrapper">
-          <div class="pcar-slides">Carousel 3 - Slide 1</div>
-          <div class="pcar-slides">Carousel 3 - Slide 2</div>
-          <div class="pcar-slides">Carousel 3 - Slide 3</div>
+        <div class="carousel-nav">
+          <button class="carousel-btn std-prev-btn">Previous</button>
+          <button class="carousel-btn std-next-btn">Next</button>
         </div>
       </div>
     </section>
@@ -196,38 +261,114 @@
   <script src="script.js"></script>
   
   <script>
-    // Initialize the basic carousel
-    const basicCarousel = new PCarousel({
-      container: '#basic-carousel',
+    // Initialize the infinite loop carousel
+    const infiniteCarousel = new PCarousel({
+      container: '#infinite-carousel',
       nextButton: '.next-btn',
       prevButton: '.prev-btn',
       loop: false,
+      infiniteLoop: true,
       speed: 300,
       slidesPerView: {
         default: 1,
         768: 2,
         1024: 3
       },
-      gap: 0,
+      gap: 10,
       slidesToMove: 1
     }).init();
     
-    // Initialize multiple carousels with the same configuration
-    const multipleCarousels = new PCarousel({
-      container: '.multiple-carousel',
-      loop: true,
+    // Initialize the standard carousel for comparison
+    const standardCarousel = new PCarousel({
+      container: '#standard-carousel',
+      nextButton: '.std-next-btn',
+      prevButton: '.std-prev-btn',
+      loop: false,
+      infiniteLoop: false,
       speed: 300,
       slidesPerView: {
         default: 1,
         768: 2,
-        1024: 2
+        1024: 3
       },
-      gap: 10,  // Add a 10px gap for these carousels
+      gap: 10,
       slidesToMove: 1
     }).init();
     
+    // Update status display with current carousel information
+    function updateStatus() {
+      const carouselData = infiniteCarousel.state.carousels[0];
+      
+      if (carouselData) {
+        document.getElementById('infinite-index').textContent = carouselData.currentIndex;
+        document.getElementById('infinite-offset').textContent = carouselData.realSlidesOffset || 0;
+        document.getElementById('infinite-total').textContent = carouselData.slides.length;
+        
+        // Highlight the active slide(s)
+        const slides = document.querySelectorAll('#infinite-carousel .pcar-slides');
+        slides.forEach((slide, index) => {
+          // Remove active class from all slides first
+          slide.classList.remove('active');
+        });
+        
+        // Add active class to current slide
+        if (slides[carouselData.currentIndex]) {
+          slides[carouselData.currentIndex].classList.add('active');
+        }
+        
+        // For debugging - highlight real vs. cloned slides
+        slides.forEach((slide, index) => {
+          // Add data attribute to help visualize real vs. cloned slides
+          if (index < carouselData.realSlidesOffset) {
+            slide.setAttribute('data-slide-type', 'clone-start');
+          } else if (index >= carouselData.realSlidesOffset + carouselData.totalSlides) {
+            slide.setAttribute('data-slide-type', 'clone-end');
+          } else {
+            slide.setAttribute('data-slide-type', 'real');
+          }
+        });
+      }
+    }
+    
+    // Add slide numbers for better visualization
+    function addSlideNumbers() {
+      document.querySelectorAll('.pcar-container').forEach(container => {
+        const slides = container.querySelectorAll('.pcar-slides');
+        
+        slides.forEach((slide, index) => {
+          // Set relative positioning for the slide
+          slide.style.position = 'relative';
+          
+          // Create and append slide number element
+          const numberElement = document.createElement('span');
+          numberElement.className = 'slide-number';
+          numberElement.textContent = `#${index + 1}`;
+          slide.appendChild(numberElement);
+        });
+      });
+    }
+    
+    // Call initial setup functions
+    addSlideNumbers();
+    updateStatus();
+    
+    // Add event listener to update status after navigation
+    document.querySelectorAll('.carousel-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Allow time for animation to complete
+        setTimeout(updateStatus, 350);
+      });
+    });
+    
+    // Listen for custom slide change events (for drag updates)
+    document.addEventListener('pcarousel:slideChanged', (event) => {
+      // Allow time for animation to complete
+      setTimeout(updateStatus, 350);
+    });
+    
     // Handle configuration updates
     document.getElementById('update-config').addEventListener('click', function() {
+      const infiniteMode = document.getElementById('infinite-mode').value === 'true';
       const loopMode = document.getElementById('loop-mode').value === 'true';
       const speed = parseInt(document.getElementById('transition-speed').value);
       const slidesDefault = parseInt(document.getElementById('slides-default').value);
@@ -236,7 +377,8 @@
       const slideGap = parseInt(document.getElementById('slide-gap').value);
       const slidesToMove = parseInt(document.getElementById('slides-to-move').value);
       
-      basicCarousel.updateConfig({
+      infiniteCarousel.updateConfig({
+        infiniteLoop: infiniteMode,
         loop: loopMode,
         speed: speed,
         slidesPerView: {
@@ -247,6 +389,9 @@
         gap: slideGap,
         slidesToMove: slidesToMove
       });
+      
+      // Update status after configuration change
+      setTimeout(updateStatus, 100);
       
       alert('Configuration updated successfully!');
     });

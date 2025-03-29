@@ -12,6 +12,8 @@ class PCarousel {
    * @param {number} config.speed - Transition speed in milliseconds
    * @param {Object} config.slidesPerView - Number of slides to show based on viewport
    *    Example: { default: 1, 768: 2, 1024: 3 }
+   * @param {number} config.gap - Gap between slides in pixels
+   * @param {number} config.slidesToMove - Number of slides to move per navigation action
    */
   constructor(config) {
     // Default configuration
@@ -22,6 +24,8 @@ class PCarousel {
       loop: false,
       speed: 300,
       slidesPerView: { default: 1 },
+      gap: 0,
+      slidesToMove: 1,
       ...config
     };
     
@@ -111,6 +115,11 @@ class PCarousel {
     // Slides styles
     slides.forEach(slide => {
       slide.style.flexShrink = '0';
+      
+      // Apply gap if configured (as margin-right)
+      if (this.config.gap > 0) {
+        slide.style.marginRight = `${this.config.gap}px`;
+      }
     });
   }
 
@@ -144,13 +153,20 @@ class PCarousel {
     
     carouselData.slidesPerView = slidesPerView;
     carouselData.containerWidth = container.offsetWidth;
-    carouselData.slideWidth = carouselData.containerWidth / slidesPerView;
+    
+    // Calculate slide width accounting for gap
+    // Total gap space = gap × (slidesPerView - 1)
+    const totalGapSpace = this.config.gap * (slidesPerView - 1);
+    carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
     carouselData.totalSlides = slides.length;
     
     // Set slide widths
     slides.forEach(slide => {
       slide.style.width = `${carouselData.slideWidth}px`;
     });
+    
+    // Store the gap value for position calculations
+    carouselData.gap = this.config.gap;
     
     // Position slides initially
     this._positionSlides(carouselData);
@@ -162,10 +178,10 @@ class PCarousel {
    * @private
    */
   _positionSlides(carouselData) {
-    const { wrapper, currentIndex, slideWidth } = carouselData;
+    const { wrapper, currentIndex, slideWidth, gap } = carouselData;
     
-    // Calculate the translation
-    const translateX = -currentIndex * slideWidth;
+    // Calculate the translation (including gaps)
+    const translateX = -currentIndex * (slideWidth + gap);
     
     // Apply the translation
     wrapper.style.transform = `translateX(${translateX}px)`;
@@ -296,19 +312,22 @@ class PCarousel {
     carouselData.isAnimating = true;
     
     const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+    // Get how many slides to move
+    const slidesToMove = this.config.slidesToMove;
     
-    if (carouselData.currentIndex >= maxIndex) {
+    if (carouselData.currentIndex + slidesToMove > maxIndex) {
       if (this.config.loop) {
         // If loop mode is enabled, go back to the first slide
         carouselData.currentIndex = 0;
       } else {
-        // Otherwise, stay at the last possible index
+        // Otherwise, go to the last possible index without exceeding
         carouselData.currentIndex = maxIndex;
         carouselData.isAnimating = false;
         return this;
       }
     } else {
-      carouselData.currentIndex++;
+      // Move by configured number of slides
+      carouselData.currentIndex += slidesToMove;
     }
     
     this._positionSlides(carouselData);
@@ -333,7 +352,10 @@ class PCarousel {
     
     carouselData.isAnimating = true;
     
-    if (carouselData.currentIndex <= 0) {
+    // Get how many slides to move
+    const slidesToMove = this.config.slidesToMove;
+    
+    if (carouselData.currentIndex - slidesToMove < 0) {
       if (this.config.loop) {
         // If loop mode is enabled, go to the last slide
         carouselData.currentIndex = carouselData.totalSlides - carouselData.slidesPerView;
@@ -344,7 +366,8 @@ class PCarousel {
         return this;
       }
     } else {
-      carouselData.currentIndex--;
+      // Move back by configured number of slides
+      carouselData.currentIndex -= slidesToMove;
     }
     
     this._positionSlides(carouselData);

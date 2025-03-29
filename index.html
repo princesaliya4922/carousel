@@ -127,6 +127,7 @@
           <div class="pcar-slides">Slide 3</div>
           <div class="pcar-slides">Slide 4</div>
           <div class="pcar-slides">Slide 5</div>
+          <div class="pcar-slides">Slide 6</div>
         </div>
         <div class="carousel-nav">
           <button class="carousel-btn prev-btn">Previous</button>
@@ -158,6 +159,14 @@
         <div class="config-group">
           <label for="slides-desktop">Slides Per View (Desktop - 1024px):</label>
           <input type="number" id="slides-desktop" value="3" min="1" max="5">
+        </div>
+        <div class="config-group">
+          <label for="slide-gap">Gap Between Slides (px):</label>
+          <input type="number" id="slide-gap" value="0" min="0" max="50">
+        </div>
+        <div class="config-group">
+          <label for="slides-to-move">Slides to Move per Click:</label>
+          <input type="number" id="slides-to-move" value="1" min="1" max="5">
         </div>
         <button class="update-config-btn" id="update-config">Update Configuration</button>
       </div>
@@ -198,7 +207,9 @@
         default: 1,
         768: 2,
         1024: 3
-      }
+      },
+      gap: 0,
+      slidesToMove: 1
     }).init();
     
     // Initialize multiple carousels with the same configuration
@@ -210,7 +221,9 @@
         default: 1,
         768: 2,
         1024: 2
-      }
+      },
+      gap: 10,  // Add a 10px gap for these carousels
+      slidesToMove: 1
     }).init();
     
     // Handle configuration updates
@@ -220,6 +233,8 @@
       const slidesDefault = parseInt(document.getElementById('slides-default').value);
       const slidesTablet = parseInt(document.getElementById('slides-tablet').value);
       const slidesDesktop = parseInt(document.getElementById('slides-desktop').value);
+      const slideGap = parseInt(document.getElementById('slide-gap').value);
+      const slidesToMove = parseInt(document.getElementById('slides-to-move').value);
       
       basicCarousel.updateConfig({
         loop: loopMode,
@@ -228,7 +243,9 @@
           default: slidesDefault,
           768: slidesTablet,
           1024: slidesDesktop
-        }
+        },
+        gap: slideGap,
+        slidesToMove: slidesToMove
       });
       
       alert('Configuration updated successfully!');

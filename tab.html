@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCarousel Tabs Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    /* Tabs styling */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .tabs button {
+      padding: 10px 20px;
+      background: #ccc;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .tabs button.active {
+      background: #2196F3;
+      color: white;
+    }
+    /* Carousel styling */
+    .pcar-container {
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 15px;
+    }
+    .pcar-wrapper {
+      display: flex;
+      transition: transform 300ms ease;
+      will-change: transform;
+    }
+    .pcar-slides {
+      flex-shrink: 0;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      position: relative;
+    }
+    /* Navigation buttons */
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .carousel-btn {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .carousel-btn:hover {
+      background: #45a049;
+    }
+    /* Slide number overlay (for clarity) */
+    .slide-number {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PCarousel Tabs Demo</h1>
+    <!-- Tabs for selecting slides -->
+    <div class="tabs" id="tabs">
+      <button data-tab-index="0" class="tab-btn active">Slide 1</button>
+      <button data-tab-index="1" class="tab-btn">Slide 2</button>
+      <button data-tab-index="2" class="tab-btn">Slide 3</button>
+      <button data-tab-index="3" class="tab-btn">Slide 4</button>
+    </div>
+
+    <!-- Carousel container with 4 slides -->
+    <div class="pcar-container" id="carousel-demo">
+      <div class="pcar-wrapper">
+        <div class="pcar-slides">Slide 1<div class="slide-number">1</div></div>
+        <div class="pcar-slides">Slide 2<div class="slide-number">2</div></div>
+        <div class="pcar-slides">Slide 3<div class="slide-number">3</div></div>
+        <div class="pcar-slides">Slide 4<div class="slide-number">4</div></div>
+      </div>
+    </div>
+
+    <!-- Navigation buttons -->
+    <div class="carousel-nav">
+      <button class="carousel-btn prev-btn">Previous</button>
+      <button class="carousel-btn next-btn">Next</button>
+    </div>
+  </div>
+
+  <!-- Import the carousel library -->
+  <script src="script.js"></script>
+  <script>
+    // Initialize the carousel with infinite loop enabled
+    const carouselInstance = new PCarousel({
+      container: '#carousel-demo',
+      nextButton: '.next-btn',
+      prevButton: '.prev-btn',
+      loop: false,
+      infiniteLoop: true,
+      speed: 300,
+      slidesPerView: { default: 1,
+        1080: 3
+       },
+      gap: 0,
+      slidesToMove: 1
+    }).init();
+
+    // Helper: Update active tab based on current slide
+    function updateActiveTab(carouselData) {
+      // Compute the active logical slide index:
+      // For infinite mode, subtract realSlidesOffset
+      let activeIndex = carouselData.currentIndex;
+      if (carouselData.isInfinite) {
+        activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
+      }
+      // Ensure it's within 0 to total real slides - 1
+      activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
+      
+      // Update tab button active classes
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const btnIndex = parseInt(btn.getAttribute('data-tab-index'), 10);
+        if (btnIndex === activeIndex) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    // Listen for carousel slide change events and update active tab
+    document.addEventListener('pcarousel:slideChanged', (event) => {
+      const carouselData = event.detail && event.detail.container ?
+        carouselInstance._getCarouselData(event.detail.container) :
+        carouselInstance.state.carousels[0];
+      if (carouselData) {
+        updateActiveTab(carouselData);
+      }
+    });
+
+    // Set up tab button click event to trigger slideTo
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const targetIndex = parseInt(this.getAttribute('data-tab-index'), 10);
+        // Use slideTo without the container argument since there is only one carousel
+        carouselInstance.slideTo(targetIndex);
+      });
+    });
+
+    // Optional: Trigger an initial active tab update after a slight delay
+    setTimeout(() => {
+      const carouselData = carouselInstance.state.carousels[0];
+      updateActiveTab(carouselData);
+    }, 350);
+  </script>
+</body>
+</html>

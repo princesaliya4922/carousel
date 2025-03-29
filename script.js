@@ -1,6 +1,6 @@
 /**
  * PCarousel - A customizable carousel library
- * Enhanced with infiniteLoop functionality
+ * Enhanced with infiniteLoop and built-in tabs support functionality.
  */
 class PCarousel {
   /**
@@ -16,6 +16,14 @@ class PCarousel {
    *    Example: { default: 1, 768: 2, 1024: 3 }
    * @param {number} config.gap - Gap between slides in pixels
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
+   * @param {Object} [config.tabsConfig] - Optional configuration for tab buttons
+   *    Example:
+   *    {
+   *      container: '.tabs-container',
+   *      buttonSelector: '.tab-btn', // optional
+   *      mapping: [0, 2, 1, 3],        // optional, maps button order to slide index
+   *      activeClass: 'active'         // optional
+   *    }
    */
   constructor(config) {
     // Default configuration
@@ -95,23 +103,124 @@ class PCarousel {
     
     this.state.carousels.push(carouselData);
     
-    // Apply initial styles
+    // Apply initial styles and functionality
     this._applyStyles(carouselData);
     
-    // Handle infinite loop setup if enabled
+    // Setup infinite loop if enabled
     if (this.config.infiniteLoop) {
       this._setupInfiniteLoop(carouselData);
     }
     
-    // Calculate slide dimensions
+    // Calculate dimensions and position slides
     this._calculateDimensions(carouselData);
     
-    // Initialize navigation if specified
+    // Initialize navigation buttons
     this._initNavigation(carouselData);
     
-    // Add touch support
+    // Initialize touch/drag events
     this._initTouchEvents(carouselData);
+    
+    // Initialize tabs if configured
+    if (this.config.tabsConfig && this.config.tabsConfig.container) {
+      this._initTabs(carouselData);
+    }
   }
+
+  /**
+   * Initialize tab buttons functionality based on tabsConfig
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _initTabs(carouselData) {
+    const tabsConf = this.config.tabsConfig;
+    const tabsContainer = document.querySelector(tabsConf.container);
+    if (!tabsContainer) {
+      console.warn(`Tabs container not found for selector ${tabsConf.container}`);
+      return;
+    }
+    
+    let buttons;
+    if (tabsConf.buttonSelector) {
+      buttons = tabsContainer.querySelectorAll(tabsConf.buttonSelector);
+    } else {
+      buttons = tabsContainer.children;
+    }
+    buttons = Array.from(buttons);
+    
+    // Save tabs info in carouselData for later use
+    carouselData.tabsConfig = tabsConf;
+    carouselData.tabsContainer = tabsContainer;
+    carouselData.tabButtons = buttons;
+    
+    // Attach click events for each tab button
+    buttons.forEach((btn, index) => {
+      btn.addEventListener('click', () => {
+        // Determine target slide from mapping if provided, else use button index
+        let targetSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping) 
+                          ? tabsConf.mapping[index]
+                          : index;
+        if (targetSlide < 0 || targetSlide >= carouselData.totalSlides) {
+          console.warn(`Mapping for tab index ${index} is out-of-bound.`);
+          return;
+        }
+        // If multiple carousels exist, use container from carouselData
+        this.slideTo(carouselData.container, targetSlide);
+      });
+    });
+    
+    // Set initial active tab
+    this._updateTabsActive(carouselData);
+  }
+
+  /**
+ * Update the active state of tab buttons based on the current slide
+ * @param {Object} carouselData - Data for a specific carousel
+ * @private
+ */
+_updateTabsActive(carouselData) {
+  if (!carouselData.tabsConfig || !carouselData.tabButtons) return;
+  
+  let activeIndex = carouselData.currentIndex;
+  if (carouselData.isInfinite) {
+    activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
+  }
+  activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
+  
+  const tabsConf = carouselData.tabsConfig;
+  const activeClass = tabsConf.activeClass || 'active';
+  
+  // New: Check if rangeMapping is enabled
+  if (tabsConf.rangeMapping && Array.isArray(tabsConf.mapping) && tabsConf.mapping.length > 0) {
+    // Use the mapping thresholds: for each tab, mapping[i] is the minimum slide index for that tab
+    let selectedTab = 0;
+    for (let i = 0; i < tabsConf.mapping.length; i++) {
+      if (activeIndex >= tabsConf.mapping[i]) {
+        selectedTab = i;
+      }
+    }
+    // Update buttons: selectedTab becomes active.
+    carouselData.tabButtons.forEach((btn, i) => {
+      if (i === selectedTab) {
+        btn.classList.add(activeClass);
+      } else {
+        btn.classList.remove(activeClass);
+      }
+    });
+  } else {
+    // Default (non-range): either use mapping equality or identity mapping.
+    carouselData.tabButtons.forEach((btn, i) => {
+      let mappedSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
+                        ? tabsConf.mapping[i]
+                        : i;
+      if (mappedSlide === activeIndex) {
+        btn.classList.add(activeClass);
+      } else {
+        btn.classList.remove(activeClass);
+      }
+    });
+  }
+}
+
 
   /**
    * Setup infinite loop by cloning slides and positioning them
@@ -119,19 +228,16 @@ class PCarousel {
    * @private
    */
   _setupInfiniteLoop(carouselData) {
-    const { wrapper, slides, originalSlides } = carouselData;
+    const { wrapper, originalSlides } = carouselData;
     
-    // First, clear any existing clones to avoid duplicates on reinit
+    // Clear any existing clones to avoid duplicates
     this._clearClonedSlides(carouselData);
     
-    // Determine how many slides to clone based on slidesPerView
-    // We'll get the maximum possible slidesPerView value from all breakpoints
+    // Determine the maximum slides per view from breakpoints
     const breakpointValues = Object.values(this.config.slidesPerView);
     const maxSlidesPerView = Math.max(...breakpointValues);
     
-    // Clone enough slides to ensure smooth infinite scrolling
-    // We need at least maxSlidesPerView slides at each end
-    // Add a buffer of slidesToMove for smoother experience
+    // Clone count: at least maxSlidesPerView plus slidesToMove buffer
     const cloneCount = maxSlidesPerView + this.config.slidesToMove;
     
     // Clone beginning slides and append to the end
@@ -156,14 +262,13 @@ class PCarousel {
       endClones.push(clone);
     }
     
-    // Store cloned slides and update the offset
     carouselData.clonedSlides = [...endClones, ...beginClones];
     carouselData.realSlidesOffset = endClones.length;
     
     // Update slides array to include clones
     carouselData.slides = Array.from(wrapper.querySelectorAll('.pcar-slides'));
     
-    // Set the initial position to the first real slide (after the clones)
+    // Set initial position to the first real slide
     carouselData.currentIndex = carouselData.realSlidesOffset;
   }
 
@@ -174,18 +279,14 @@ class PCarousel {
    */
   _clearClonedSlides(carouselData) {
     const { wrapper, clonedSlides } = carouselData;
-    
     if (clonedSlides && clonedSlides.length) {
       clonedSlides.forEach(clone => {
         if (clone.parentNode === wrapper) {
           wrapper.removeChild(clone);
         }
       });
-      
       carouselData.clonedSlides = [];
     }
-    
-    // Reset slides to original slides
     carouselData.slides = [...carouselData.originalSlides];
   }
 
@@ -196,21 +297,14 @@ class PCarousel {
    */
   _applyStyles(carouselData) {
     const { container, wrapper, slides } = carouselData;
-    
-    // Container styles
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
-    
-    // Wrapper styles
     wrapper.style.display = 'flex';
     wrapper.style.transition = `transform ${this.config.speed}ms ease`;
     wrapper.style.willChange = 'transform';
     
-    // Slides styles
     slides.forEach(slide => {
       slide.style.flexShrink = '0';
-      
-      // Apply gap if configured (as margin-right)
       if (this.config.gap > 0) {
         slide.style.marginRight = `${this.config.gap}px`;
       }
@@ -224,23 +318,17 @@ class PCarousel {
    */
   _calculateDimensions(carouselData) {
     const { container, wrapper, slides } = carouselData;
-    
-    // Get current viewport width
     const viewportWidth = window.innerWidth;
     
-    // Determine slides per view based on viewport
     let slidesPerView = this.config.slidesPerView.default;
-    
-    // Sort breakpoints in descending order
     const breakpoints = Object.keys(this.config.slidesPerView)
       .filter(bp => bp !== 'default')
       .map(bp => parseInt(bp, 10))
       .sort((a, b) => b - a);
     
-    // Find the appropriate breakpoint
-    for (const breakpoint of breakpoints) {
-      if (viewportWidth >= breakpoint) {
-        slidesPerView = this.config.slidesPerView[breakpoint];
+    for (const bp of breakpoints) {
+      if (viewportWidth >= bp) {
+        slidesPerView = this.config.slidesPerView[bp];
         break;
       }
     }
@@ -248,45 +336,32 @@ class PCarousel {
     carouselData.slidesPerView = slidesPerView;
     carouselData.containerWidth = container.offsetWidth;
     
-    // Calculate slide width accounting for gap
-    // Total gap space = gap × (slidesPerView - 1)
     const totalGapSpace = this.config.gap * (slidesPerView - 1);
     carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
     
-    // Set total slides count
-    // For infinite loop, this is the count of original slides, not including clones
     carouselData.totalSlides = carouselData.originalSlides.length;
     
-    // Set slide widths
     slides.forEach(slide => {
       slide.style.width = `${carouselData.slideWidth}px`;
     });
     
-    // Store the gap value for position calculations
     carouselData.gap = this.config.gap;
     
-    // Check if we need to update infinite loop setup on resize
     if (carouselData.isInfinite) {
-      // We might need to add or remove clones based on the new slidesPerView
       this._setupInfiniteLoop(carouselData);
     }
     
-    // Position slides initially
     this._positionSlides(carouselData);
   }
 
   /**
-   * Position slides based on current index
+   * Position slides based on the current index
    * @param {Object} carouselData - Data for a specific carousel
    * @private
    */
   _positionSlides(carouselData) {
     const { wrapper, currentIndex, slideWidth, gap } = carouselData;
-    
-    // Calculate the translation (including gaps)
     const translateX = -currentIndex * (slideWidth + gap);
-    
-    // Apply the translation
     wrapper.style.transform = `translateX(${translateX}px)`;
   }
 
@@ -299,38 +374,19 @@ class PCarousel {
     if (!carouselData.isInfinite) return;
     
     const { currentIndex, realSlidesOffset, totalSlides, wrapper } = carouselData;
-    
-    // Calculate the threshold points for reset
     const endThreshold = realSlidesOffset + totalSlides;
     
-    // If we've scrolled past the cloned slides at the start
     if (currentIndex < realSlidesOffset) {
-      // Disable transition temporarily
       wrapper.style.transition = 'none';
-      
-      // Jump to the corresponding real slide from the end
       carouselData.currentIndex = endThreshold - (realSlidesOffset - currentIndex);
       this._positionSlides(carouselData);
-      
-      // Force browser reflow to make the jump instantaneous
       void wrapper.offsetWidth;
-      
-      // Re-enable transition
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
-    }
-    // If we've scrolled past the cloned slides at the end
-    else if (currentIndex >= endThreshold) {
-      // Disable transition temporarily
+    } else if (currentIndex >= endThreshold) {
       wrapper.style.transition = 'none';
-      
-      // Jump to the corresponding real slide from the beginning
       carouselData.currentIndex = realSlidesOffset + (currentIndex - endThreshold);
       this._positionSlides(carouselData);
-      
-      // Force browser reflow to make the jump instantaneous
       void wrapper.offsetWidth;
-      
-      // Re-enable transition
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
     }
   }
@@ -342,24 +398,16 @@ class PCarousel {
    */
   _initNavigation(carouselData) {
     const { container } = carouselData;
-    
-    // Next button
     if (this.config.nextButton) {
-      const nextBtn = container.querySelector(this.config.nextButton) || 
-                      document.querySelector(this.config.nextButton);
-      
+      const nextBtn = container.querySelector(this.config.nextButton) || document.querySelector(this.config.nextButton);
       if (nextBtn) {
         nextBtn.addEventListener('click', () => {
           this.next(container);
         });
       }
     }
-    
-    // Previous button
     if (this.config.prevButton) {
-      const prevBtn = container.querySelector(this.config.prevButton) || 
-                      document.querySelector(this.config.prevButton);
-      
+      const prevBtn = container.querySelector(this.config.prevButton) || document.querySelector(this.config.prevButton);
       if (prevBtn) {
         prevBtn.addEventListener('click', () => {
           this.prev(container);
@@ -378,123 +426,81 @@ class PCarousel {
     let startX, moveX, isDragging = false;
     let initialTransform = 0;
     
-    // Touch/Mouse start
     const handleDragStart = (e) => {
-      // Allow interactive elements (input, button, select, textarea) to work normally
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) {
         return;
       }
-      
       e.preventDefault();
       startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
       isDragging = true;
-      
-      // Store the current transform value
       const transform = window.getComputedStyle(wrapper).getPropertyValue('transform');
       const matrix = new DOMMatrix(transform);
-      initialTransform = matrix.m41; // Get the X translation value
-      
-      // Disable transition during drag
+      initialTransform = matrix.m41;
       wrapper.style.transition = 'none';
-      
-      // Add cursor styling for better UX
       wrapper.style.cursor = 'grabbing';
     };
     
-    // Touch/Mouse move
     const handleDragMove = (e) => {
       if (!isDragging) return;
-      
       moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
       const diff = moveX - startX;
-      
-      // Determine boundaries based on loop/infiniteLoop mode
       let adjustedDiff = diff;
       
       if (!carouselData.isInfinite && !this.config.loop) {
         const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-        
-        // Restrict dragging past the first slide (left boundary)
         if (carouselData.currentIndex === 0 && diff > 0) {
-          adjustedDiff = diff * 0.3; // Apply resistance effect
+          adjustedDiff = diff * 0.3;
         }
-        
-        // Restrict dragging past the last slide (right boundary)
         if (carouselData.currentIndex === maxIndex && diff < 0) {
-          adjustedDiff = diff * 0.3; // Apply resistance effect
+          adjustedDiff = diff * 0.3;
         }
       }
-      
-      // Apply the translation with boundary limits
       wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
     };
     
-    // Touch/Mouse end
     const handleDragEnd = (e) => {
       if (!isDragging) return;
-      
-      // Re-enable transition
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
       wrapper.style.cursor = 'grab';
-      
-      const endX = e.type === 'touchend' ? 
-        (e.changedTouches ? e.changedTouches[0].clientX : moveX) : 
-        e.clientX || moveX;
-      
+      const endX = e.type === 'touchend' ? (e.changedTouches ? e.changedTouches[0].clientX : moveX) : e.clientX || moveX;
       const diff = endX - startX;
-      
-      // Check if we're at a boundary and not in loop/infiniteLoop mode
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
       const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
-      const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? 
-        carouselData.realSlidesOffset + maxIndex : maxIndex);
+      const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
       
-      // If swipe distance is enough and we're not at a boundary (or we're in loop/infiniteLoop mode)
       if (Math.abs(diff) > 50) {
         if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
           this.prev(container);
         } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
           this.next(container);
         } else {
-          // Reset to current position if we're at a boundary and not in loop mode
           this._positionSlides(carouselData);
         }
       } else {
-        // Reset to current position for small movements
         this._positionSlides(carouselData);
       }
       
       isDragging = false;
-      
-      // Trigger a custom event for external status updates
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
       document.dispatchEvent(event);
     };
     
-    // Add event listeners for touch devices
     container.addEventListener('touchstart', handleDragStart, { passive: false });
     container.addEventListener('touchmove', handleDragMove, { passive: true });
     container.addEventListener('touchend', handleDragEnd);
-    
-    // Add event listeners for mouse drag
     container.addEventListener('mousedown', handleDragStart);
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
-    
-    // Add initial grab cursor
     wrapper.style.cursor = 'grab';
-    
-    // Store event handlers for cleanup in destroy method
     carouselData.eventHandlers = {
       handleDragStart,
       handleDragMove,
       handleDragEnd
     };
   }
-  
 
   /**
    * Handle window resize event
@@ -516,7 +522,6 @@ class PCarousel {
     if (typeof container === 'string') {
       container = document.querySelector(container);
     }
-    
     return this.state.carousels.find(data => data.container === container) || null;
   }
 
@@ -527,50 +532,37 @@ class PCarousel {
    */
   next(container) {
     const carouselData = this._getCarouselData(container);
-    
     if (!carouselData || carouselData.isAnimating) return this;
-    
     carouselData.isAnimating = true;
-    
-    // Get how many slides to move
     const slidesToMove = this.config.slidesToMove;
     
     if (carouselData.isInfinite) {
-      // In infinite loop mode, we can always move forward
       carouselData.currentIndex += slidesToMove;
     } else {
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      
       if (carouselData.currentIndex + slidesToMove > maxIndex) {
         if (this.config.loop) {
-          // If loop mode is enabled, go back to the first slide
           carouselData.currentIndex = 0;
         } else {
-          // Otherwise, go to the last possible index without exceeding
           carouselData.currentIndex = maxIndex;
           carouselData.isAnimating = false;
           return this;
         }
       } else {
-        // Move by configured number of slides
         carouselData.currentIndex += slidesToMove;
       }
     }
     
     this._positionSlides(carouselData);
-    
-    // Check if we need to reset for infinite loop
     if (carouselData.isInfinite) {
       setTimeout(() => {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
     
-    // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
-      
-      // Trigger a custom event for external status updates
+      this._updateTabsActive(carouselData);
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
@@ -587,48 +579,36 @@ class PCarousel {
    */
   prev(container) {
     const carouselData = this._getCarouselData(container);
-    
     if (!carouselData || carouselData.isAnimating) return this;
-    
     carouselData.isAnimating = true;
-    
-    // Get how many slides to move
     const slidesToMove = this.config.slidesToMove;
     
     if (carouselData.isInfinite) {
-      // In infinite loop mode, we can always move backward
       carouselData.currentIndex -= slidesToMove;
     } else {
       if (carouselData.currentIndex - slidesToMove < 0) {
         if (this.config.loop) {
-          // If loop mode is enabled, go to the last slide
           carouselData.currentIndex = carouselData.totalSlides - carouselData.slidesPerView;
         } else {
-          // Otherwise, stay at the first slide
           carouselData.currentIndex = 0;
           carouselData.isAnimating = false;
           return this;
         }
       } else {
-        // Move back by configured number of slides
         carouselData.currentIndex -= slidesToMove;
       }
     }
     
     this._positionSlides(carouselData);
-    
-    // Check if we need to reset for infinite loop
     if (carouselData.isInfinite) {
       setTimeout(() => {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
     
-    // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
-      
-      // Trigger a custom event for external status updates
+      this._updateTabsActive(carouselData);
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
@@ -639,50 +619,36 @@ class PCarousel {
   }
 
   /**
-   * Go to a specific slide
+   * Go to a specific slide by index (zero-based for real slides)
    * @param {HTMLElement|string} container - Container element or selector
    * @param {number} index - Target slide index (zero-based for real slides)
    * @returns {PCarousel} - Returns the carousel instance for chaining
    */
   goTo(container, index) {
-    // Existing goTo implementation...
     const carouselData = this._getCarouselData(container);
-    
     if (!carouselData || carouselData.isAnimating) return this;
-    
     carouselData.isAnimating = true;
-    
     const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-    
-    // Adjust index for infinite loop to account for cloned slides
     let targetIndex = index;
     if (carouselData.isInfinite) {
       targetIndex = index + carouselData.realSlidesOffset;
     }
     
-    // Ensure index is within bounds
     if (targetIndex < (carouselData.isInfinite ? carouselData.realSlidesOffset : 0)) {
       carouselData.currentIndex = carouselData.isInfinite ? carouselData.realSlidesOffset : 0;
-    } else if (targetIndex > (carouselData.isInfinite ? 
-      carouselData.realSlidesOffset + maxIndex : maxIndex)) {
-      carouselData.currentIndex = carouselData.isInfinite ? 
-        carouselData.realSlidesOffset + maxIndex : maxIndex;
+    } else if (targetIndex > (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex)) {
+      carouselData.currentIndex = carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex;
     } else {
       carouselData.currentIndex = targetIndex;
     }
     
     this._positionSlides(carouselData);
-    
-    // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
-      
-      // Check for infinite loop reset
       if (carouselData.isInfinite) {
         this._checkInfiniteLoopReset(carouselData);
       }
-      
-      // Trigger a custom event for external status updates
+      this._updateTabsActive(carouselData);
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
@@ -693,51 +659,40 @@ class PCarousel {
   }
   
   /**
-   * Slide to a specific slide by index (zero-based index for real slides)
-   * This new method ensures the target main slide becomes active and appears first.
-   * It works seamlessly in both standard and infinite loop modes.
-   * @param {HTMLElement|string} container - Container element or selector
-   * @param {number} index - Zero-based index of the main (real) slide to activate
+   * Slide to a specific slide by index (zero-based for real slides)
+   * @param {HTMLElement|string|number} container - Container element/selector or index if single carousel
+   * @param {number} [index] - Target slide index if container is provided
    * @returns {PCarousel} - Returns the carousel instance for chaining
    */
   slideTo(container, index) {
-
+    // Allow calling slideTo with just an index if there's only one carousel
     if (typeof container === 'number') {
       index = container;
       container = this.state.carousels[0].container;
     }
-
+    
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
-    
     carouselData.isAnimating = true;
     
-    // Clamp the target index within the bounds of real slides
     const totalRealSlides = carouselData.totalSlides;
     const targetRealIndex = Math.max(0, Math.min(index, totalRealSlides - 1));
-    
-    // For infinite mode, adjust the target index by the realSlidesOffset
     let targetIndex = targetRealIndex;
     if (carouselData.isInfinite) {
       targetIndex = targetRealIndex + carouselData.realSlidesOffset;
     }
     
-    // Set the current index to the computed target index
     carouselData.currentIndex = targetIndex;
-    
-    // Animate to the new position
     this._positionSlides(carouselData);
-    
-    // For infinite mode, check if a reset is needed after the transition
     if (carouselData.isInfinite) {
       setTimeout(() => {
         this._checkInfiniteLoopReset(carouselData);
       }, this.config.speed);
     }
     
-    // After transition completes, clear the animating flag and dispatch the event
     setTimeout(() => {
       carouselData.isAnimating = false;
+      this._updateTabsActive(carouselData);
       const event = new CustomEvent('pcarousel:slideChanged', { 
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
       });
@@ -753,29 +708,17 @@ class PCarousel {
    * @returns {PCarousel} - Returns the carousel instance for chaining
    */
   updateConfig(newConfig) {
-    const oldConfig = {...this.config};
-    this.config = {
-      ...this.config,
-      ...newConfig
-    };
-    
-    // Check if infiniteLoop setting changed
+    const oldConfig = { ...this.config };
+    this.config = { ...this.config, ...newConfig };
     const infiniteLoopChanged = oldConfig.infiniteLoop !== this.config.infiniteLoop;
     
-    // Reinitialize carousels with new config
     this.state.carousels.forEach(carouselData => {
-      // Update infinite loop state
       if (infiniteLoopChanged) {
         carouselData.isInfinite = this.config.infiniteLoop;
-        
         if (carouselData.isInfinite) {
-          // If enabling infinite loop, set it up
           this._setupInfiniteLoop(carouselData);
         } else {
-          // If disabling infinite loop, clean up cloned slides
           this._clearClonedSlides(carouselData);
-          
-          // Reset index to appropriate position
           carouselData.currentIndex = Math.min(
             carouselData.currentIndex - carouselData.realSlidesOffset,
             carouselData.totalSlides - carouselData.slidesPerView
@@ -787,6 +730,11 @@ class PCarousel {
       
       this._applyStyles(carouselData);
       this._calculateDimensions(carouselData);
+      
+      // Reinitialize tabs if tabsConfig is provided
+      if (this.config.tabsConfig && this.config.tabsConfig.container) {
+        this._initTabs(carouselData);
+      }
     });
     
     return this;
@@ -797,48 +745,34 @@ class PCarousel {
    */
   destroy() {
     window.removeEventListener('resize', this._handleResize.bind(this));
-    
     this.state.carousels.forEach(carouselData => {
       const { container, wrapper, slides, eventHandlers } = carouselData;
-      
-      // Clear cloned slides if infinite loop was enabled
       if (carouselData.isInfinite) {
         this._clearClonedSlides(carouselData);
       }
-      
-      // Remove styles
       container.style.overflow = '';
       container.style.position = '';
-      
       wrapper.style.display = '';
       wrapper.style.transition = '';
       wrapper.style.transform = '';
       wrapper.style.willChange = '';
       wrapper.style.cursor = '';
-      
       slides.forEach(slide => {
         slide.style.flexShrink = '';
         slide.style.width = '';
         slide.style.marginRight = '';
       });
-      
-      // Properly remove event listeners if available
       if (eventHandlers) {
         container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: false });
         container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: true });
         container.removeEventListener('touchend', eventHandlers.handleDragEnd);
-        
         container.removeEventListener('mousedown', eventHandlers.handleDragStart);
         window.removeEventListener('mousemove', eventHandlers.handleDragMove);
         window.removeEventListener('mouseup', eventHandlers.handleDragEnd);
       }
-      
-      // For other event listeners that might not be tracked
       const newContainer = container.cloneNode(true);
       container.parentNode.replaceChild(newContainer, container);
     });
-    
-    // Reset state
     this.state.carousels = [];
   }
 }

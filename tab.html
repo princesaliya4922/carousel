@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCarousel Tabs Demo</title>
+  <title>PCarousel with Range-Mapped Tabs Demo</title>
   <style>
     * {
       box-sizing: border-box;
@@ -13,33 +13,37 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
+      background: #f0f0f0;
     }
     .container {
       max-width: 800px;
       margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
     }
     h1 {
       text-align: center;
       margin-bottom: 20px;
     }
-    /* Tabs styling */
-    .tabs {
+    /* Tabs container styling */
+    .tabs-container {
       display: flex;
       justify-content: center;
       gap: 10px;
       margin-bottom: 15px;
     }
-    .tabs button {
+    .tabs-container .tab-btn {
       padding: 10px 20px;
-      background: #ccc;
+      background: #ddd;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.3s;
     }
-    .tabs button.active {
+    .tabs-container .tab-btn.active {
       background: #2196F3;
-      color: white;
+      color: #fff;
     }
     /* Carousel styling */
     .pcar-container {
@@ -61,25 +65,7 @@
       border: 1px solid #ddd;
       position: relative;
     }
-    /* Navigation buttons */
-    .carousel-nav {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .carousel-btn {
-      padding: 8px 16px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .carousel-btn:hover {
-      background: #45a049;
-    }
-    /* Slide number overlay (for clarity) */
+    /* Slide number overlay for clarity */
     .slide-number {
       position: absolute;
       top: 10px;
@@ -90,20 +76,37 @@
       border-radius: 4px;
       font-size: 14px;
     }
+    /* Navigation buttons */
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .carousel-btn {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .carousel-btn:hover {
+      background: #45a049;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>PCarousel Tabs Demo</h1>
-    <!-- Tabs for selecting slides -->
-    <div class="tabs" id="tabs">
-      <button data-tab-index="0" class="tab-btn active">Slide 1</button>
-      <button data-tab-index="1" class="tab-btn">Slide 2</button>
-      <button data-tab-index="2" class="tab-btn">Slide 3</button>
-      <button data-tab-index="3" class="tab-btn">Slide 4</button>
+    <h1>PCarousel with Range-Mapped Tabs Demo</h1>
+    
+    <!-- Tabs Container with 2 Buttons -->
+    <div class="tabs-container">
+      <button class="tab-btn">Tab 1 (Slides 0-3)</button>
+      <button class="tab-btn">Tab 2 (Slides 4+)</button>
     </div>
-
-    <!-- Carousel container with 4 slides -->
+    
+    <!-- Carousel Container with 4 Slides -->
     <div class="pcar-container" id="carousel-demo">
       <div class="pcar-wrapper">
         <div class="pcar-slides">Slide 1<div class="slide-number">1</div></div>
@@ -112,18 +115,22 @@
         <div class="pcar-slides">Slide 4<div class="slide-number">4</div></div>
       </div>
     </div>
-
-    <!-- Navigation buttons -->
+    
+    <!-- Navigation Buttons -->
     <div class="carousel-nav">
       <button class="carousel-btn prev-btn">Previous</button>
       <button class="carousel-btn next-btn">Next</button>
     </div>
   </div>
-
-  <!-- Import the carousel library -->
+  
+  <!-- Import the updated PCarousel Library -->
   <script src="script.js"></script>
   <script>
-    // Initialize the carousel with infinite loop enabled
+    // Initialize the carousel with rangeMapping enabled.
+    // Here, slidesPerView is set to 3 for demonstration purposes.
+    // There are 4 slides and 2 tabs. The mapping [0, 4] means:
+    // - Tab 1 is active when active slide index is between 0 and 3.
+    // - Tab 2 becomes active when the active slide is 4 or greater.
     const carouselInstance = new PCarousel({
       container: '#carousel-demo',
       nextButton: '.next-btn',
@@ -131,59 +138,17 @@
       loop: false,
       infiniteLoop: true,
       speed: 300,
-      slidesPerView: { default: 1,
-        1080: 3
-       },
+      slidesPerView: { default: 3 },
       gap: 0,
-      slidesToMove: 1
+      slidesToMove: 1,
+      tabsConfig: {
+        container: '.tabs-container',
+        buttonSelector: '.tab-btn',
+        mapping: [0, 2],
+        rangeMapping: true,
+        activeClass: 'active'
+      }
     }).init();
-
-    // Helper: Update active tab based on current slide
-    function updateActiveTab(carouselData) {
-      // Compute the active logical slide index:
-      // For infinite mode, subtract realSlidesOffset
-      let activeIndex = carouselData.currentIndex;
-      if (carouselData.isInfinite) {
-        activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
-      }
-      // Ensure it's within 0 to total real slides - 1
-      activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
-      
-      // Update tab button active classes
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        const btnIndex = parseInt(btn.getAttribute('data-tab-index'), 10);
-        if (btnIndex === activeIndex) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
-      });
-    }
-
-    // Listen for carousel slide change events and update active tab
-    document.addEventListener('pcarousel:slideChanged', (event) => {
-      const carouselData = event.detail && event.detail.container ?
-        carouselInstance._getCarouselData(event.detail.container) :
-        carouselInstance.state.carousels[0];
-      if (carouselData) {
-        updateActiveTab(carouselData);
-      }
-    });
-
-    // Set up tab button click event to trigger slideTo
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const targetIndex = parseInt(this.getAttribute('data-tab-index'), 10);
-        // Use slideTo without the container argument since there is only one carousel
-        carouselInstance.slideTo(targetIndex);
-      });
-    });
-
-    // Optional: Trigger an initial active tab update after a slight delay
-    setTimeout(() => {
-      const carouselData = carouselInstance.state.carousels[0];
-      updateActiveTab(carouselData);
-    }, 350);
   </script>
 </body>
 </html>

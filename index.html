@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCarousel Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .carousel-section {
+      margin-bottom: 50px;
+    }
+    
+    h2 {
+      margin-bottom: 15px;
+    }
+    
+    /* Carousel basic styling */
+    .pcar-container {
+      margin-bottom: 20px;
+    }
+    
+    .pcar-slides {
+      padding: 20px;
+      text-align: center;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    
+    /* Navigation buttons */
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .carousel-btn {
+      padding: 8px 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .carousel-btn:hover {
+      background-color: #45a049;
+    }
+    
+    /* Configuration panel */
+    .config-panel {
+      margin-top: 30px;
+      padding: 20px;
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .config-group {
+      margin-bottom: 15px;
+    }
+    
+    .config-group label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    .config-group input,
+    .config-group select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .update-config-btn {
+      padding: 10px 20px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      display: block;
+      margin: 0 auto;
+    }
+    
+    .update-config-btn:hover {
+      background-color: #0b7dda;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PCarousel Demo</h1>
+    
+    <section class="carousel-section">
+      <h2>Basic Carousel</h2>
+      <div class="pcar-container" id="basic-carousel">
+        <div class="pcar-wrapper">
+          <div class="pcar-slides">Slide 1</div>
+          <div class="pcar-slides">Slide 2</div>
+          <div class="pcar-slides">Slide 3</div>
+          <div class="pcar-slides">Slide 4</div>
+          <div class="pcar-slides">Slide 5</div>
+        </div>
+        <div class="carousel-nav">
+          <button class="carousel-btn prev-btn">Previous</button>
+          <button class="carousel-btn next-btn">Next</button>
+        </div>
+      </div>
+      
+      <div class="config-panel">
+        <h3>Configuration</h3>
+        <div class="config-group">
+          <label for="loop-mode">Loop Mode:</label>
+          <select id="loop-mode">
+            <option value="true">Enabled</option>
+            <option value="false" selected>Disabled</option>
+          </select>
+        </div>
+        <div class="config-group">
+          <label for="transition-speed">Transition Speed (ms):</label>
+          <input type="number" id="transition-speed" value="300" min="100" max="2000">
+        </div>
+        <div class="config-group">
+          <label for="slides-default">Slides Per View (Default):</label>
+          <input type="number" id="slides-default" value="1" min="1" max="5">
+        </div>
+        <div class="config-group">
+          <label for="slides-tablet">Slides Per View (Tablet - 768px):</label>
+          <input type="number" id="slides-tablet" value="2" min="1" max="5">
+        </div>
+        <div class="config-group">
+          <label for="slides-desktop">Slides Per View (Desktop - 1024px):</label>
+          <input type="number" id="slides-desktop" value="3" min="1" max="5">
+        </div>
+        <button class="update-config-btn" id="update-config">Update Configuration</button>
+      </div>
+    </section>
+    
+    <section class="carousel-section">
+      <h2>Multiple Carousels with Same Configuration</h2>
+      <div class="pcar-container multiple-carousel">
+        <div class="pcar-wrapper">
+          <div class="pcar-slides">Carousel 2 - Slide 1</div>
+          <div class="pcar-slides">Carousel 2 - Slide 2</div>
+          <div class="pcar-slides">Carousel 2 - Slide 3</div>
+        </div>
+      </div>
+      
+      <div class="pcar-container multiple-carousel">
+        <div class="pcar-wrapper">
+          <div class="pcar-slides">Carousel 3 - Slide 1</div>
+          <div class="pcar-slides">Carousel 3 - Slide 2</div>
+          <div class="pcar-slides">Carousel 3 - Slide 3</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Import the carousel library -->
+  <script src="script.js"></script>
+  
+  <script>
+    // Initialize the basic carousel
+    const basicCarousel = new PCarousel({
+      container: '#basic-carousel',
+      nextButton: '.next-btn',
+      prevButton: '.prev-btn',
+      loop: false,
+      speed: 300,
+      slidesPerView: {
+        default: 1,
+        768: 2,
+        1024: 3
+      }
+    }).init();
+    
+    // Initialize multiple carousels with the same configuration
+    const multipleCarousels = new PCarousel({
+      container: '.multiple-carousel',
+      loop: true,
+      speed: 300,
+      slidesPerView: {
+        default: 1,
+        768: 2,
+        1024: 2
+      }
+    }).init();
+    
+    // Handle configuration updates
+    document.getElementById('update-config').addEventListener('click', function() {
+      const loopMode = document.getElementById('loop-mode').value === 'true';
+      const speed = parseInt(document.getElementById('transition-speed').value);
+      const slidesDefault = parseInt(document.getElementById('slides-default').value);
+      const slidesTablet = parseInt(document.getElementById('slides-tablet').value);
+      const slidesDesktop = parseInt(document.getElementById('slides-desktop').value);
+      
+      basicCarousel.updateConfig({
+        loop: loopMode,
+        speed: speed,
+        slidesPerView: {
+          default: slidesDefault,
+          768: slidesTablet,
+          1024: slidesDesktop
+        }
+      });
+      
+      alert('Configuration updated successfully!');
+    });
+  </script>
+</body>
+</html>

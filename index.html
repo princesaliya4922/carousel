@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCarousel Infinite Loop Demo</title>
+  <title>Swipix Infinite Loop Demo</title>
   <style>
     * {
       box-sizing: border-box;
@@ -34,12 +34,12 @@
       margin-bottom: 15px;
     }
     
-    /* Carousel basic styling */
-    .pcar-container {
+    /* Carousel basic styling using new class names */
+    .pix-container {
       margin-bottom: 20px;
     }
     
-    .pcar-slides {
+    .pix-slide {
       padding: 20px;
       text-align: center;
       background-color: #f5f5f5;
@@ -127,14 +127,14 @@
     }
     
     /* Active slide indicator */
-    .pcar-slides.active {
+    .pix-slide.active {
       border: 2px solid #4CAF50;
       background-color: #e8f5e9;
     }
     
     /* Clone indicators */
-    .pcar-slides[data-slide-type="clone-start"]::before,
-    .pcar-slides[data-slide-type="clone-end"]::before {
+    .pix-slide[data-slide-type="clone-start"]::before,
+    .pix-slide[data-slide-type="clone-end"]::before {
       content: "Clone";
       position: absolute;
       top: 10px;
@@ -146,7 +146,7 @@
       font-size: 12px;
     }
     
-    .pcar-slides[data-slide-type="real"]::before {
+    .pix-slide[data-slide-type="real"]::before {
       content: "Real";
       position: absolute;
       top: 10px;
@@ -189,18 +189,18 @@
 </head>
 <body>
   <div class="container">
-    <h1>PCarousel Infinite Loop Demo</h1>
+    <h1>Swipix Infinite Loop Demo</h1>
     
     <section class="carousel-section">
       <h2>Infinite Loop Carousel</h2>
-      <div class="pcar-container" id="infinite-carousel">
-        <div class="pcar-wrapper">
-          <div class="pcar-slides">Slide 1</div>
-          <div class="pcar-slides">Slide 2</div>
-          <div class="pcar-slides">Slide 3</div>
-          <div class="pcar-slides">Slide 4</div>
-          <div class="pcar-slides">Slide 5</div>
-          <div class="pcar-slides">Slide 6</div>
+      <div class="pix-container" id="infinite-carousel">
+        <div class="pix-wrapper">
+          <div class="pix-slide">Slide 1</div>
+          <div class="pix-slide">Slide 2</div>
+          <div class="pix-slide">Slide 3</div>
+          <div class="pix-slide">Slide 4</div>
+          <div class="pix-slide">Slide 5</div>
+          <div class="pix-slide">Slide 6</div>
         </div>
         <div class="carousel-nav">
           <button class="carousel-btn prev-btn">Previous</button>
@@ -266,14 +266,14 @@
     
     <section class="carousel-section">
       <h2>Standard Carousel (for Comparison)</h2>
-      <div class="pcar-container" id="standard-carousel">
-        <div class="pcar-wrapper">
-          <div class="pcar-slides">Slide 1</div>
-          <div class="pcar-slides">Slide 2</div>
-          <div class="pcar-slides">Slide 3</div>
-          <div class="pcar-slides">Slide 4</div>
-          <div class="pcar-slides">Slide 5</div>
-          <div class="pcar-slides">Slide 6</div>
+      <div class="pix-container" id="standard-carousel">
+        <div class="pix-wrapper">
+          <div class="pix-slide">Slide 1</div>
+          <div class="pix-slide">Slide 2</div>
+          <div class="pix-slide">Slide 3</div>
+          <div class="pix-slide">Slide 4</div>
+          <div class="pix-slide">Slide 5</div>
+          <div class="pix-slide">Slide 6</div>
         </div>
         <div class="carousel-nav">
           <button class="carousel-btn std-prev-btn">Previous</button>
@@ -283,12 +283,12 @@
     </section>
   </div>
 
-  <!-- Import the carousel library -->
+  <!-- Import the Swipix library -->
   <script src="script.js"></script>
   
   <script>
-    // Initialize the infinite loop carousel
-    const infiniteCarousel = new PCarousel({
+    // Initialize the infinite loop carousel using Swipix
+    const infiniteCarousel = new Swipix({
       container: '#infinite-carousel',
       nextButton: '.next-btn',
       prevButton: '.prev-btn',
@@ -305,7 +305,7 @@
     }).init();
     
     // Initialize the standard carousel for comparison
-    const standardCarousel = new PCarousel({
+    const standardCarousel = new Swipix({
       container: '#standard-carousel',
       nextButton: '.std-next-btn',
       prevButton: '.std-prev-btn',
@@ -321,7 +321,7 @@
       slidesToMove: 1
     }).init();
     
-    // Update status display with current carousel information
+    // Update status display with current carousel information for infinite carousel
     function updateStatus() {
       const carouselData = infiniteCarousel.state.carousels[0];
       
@@ -331,20 +331,14 @@
         document.getElementById('infinite-total').textContent = carouselData.slides.length;
         
         // Highlight the active slide(s)
-        const slides = document.querySelectorAll('#infinite-carousel .pcar-slides');
-        slides.forEach((slide, index) => {
-          // Remove active class from all slides first
-          slide.classList.remove('active');
-        });
-        
-        // Add active class to current slide
+        const slides = document.querySelectorAll('#infinite-carousel .pix-slide');
+        slides.forEach(slide => slide.classList.remove('active'));
         if (slides[carouselData.currentIndex]) {
           slides[carouselData.currentIndex].classList.add('active');
         }
         
-        // For debugging - highlight real vs. cloned slides
+        // For debugging - add data attribute for real vs. clone slides
         slides.forEach((slide, index) => {
-          // Add data attribute to help visualize real vs. cloned slides
           if (index < carouselData.realSlidesOffset) {
             slide.setAttribute('data-slide-type', 'clone-start');
           } else if (index >= carouselData.realSlidesOffset + carouselData.totalSlides) {
@@ -358,14 +352,10 @@
     
     // Add slide numbers for better visualization
     function addSlideNumbers() {
-      document.querySelectorAll('.pcar-container').forEach(container => {
-        const slides = container.querySelectorAll('.pcar-slides');
-        
+      document.querySelectorAll('.pix-container').forEach(container => {
+        const slides = container.querySelectorAll('.pix-slide');
         slides.forEach((slide, index) => {
-          // Set relative positioning for the slide
           slide.style.position = 'relative';
-          
-          // Create and append slide number element
           const numberElement = document.createElement('span');
           numberElement.className = 'slide-number';
           numberElement.textContent = `#${index + 1}`;
@@ -378,17 +368,15 @@
     addSlideNumbers();
     updateStatus();
     
-    // Add event listener to update status after navigation
+    // Update status after navigation buttons click
     document.querySelectorAll('.carousel-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        // Allow time for animation to complete
         setTimeout(updateStatus, 350);
       });
     });
     
-    // Listen for custom slide change events (for drag updates)
-    document.addEventListener('pcarousel:slideChanged', (event) => {
-      // Allow time for animation to complete
+    // Listen for custom slide change events (using Swipix event name)
+    document.addEventListener('swipix:slideChanged', () => {
       setTimeout(updateStatus, 350);
     });
     
@@ -416,9 +404,7 @@
         slidesToMove: slidesToMove
       });
       
-      // Update status after configuration change
       setTimeout(updateStatus, 100);
-      
       alert('Configuration updated successfully!');
     });
     

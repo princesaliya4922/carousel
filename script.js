@@ -1,5 +1,6 @@
 /**
  * PCarousel - A customizable carousel library
+ * Enhanced with infiniteLoop functionality
  */
 class PCarousel {
   /**
@@ -8,7 +9,8 @@ class PCarousel {
    * @param {string} config.container - Selector for the carousel container
    * @param {string|null} config.nextButton - Selector for next button (null for no button)
    * @param {string|null} config.prevButton - Selector for previous button (null for no button)
-   * @param {boolean} config.loop - Enable infinite sliding
+   * @param {boolean} config.loop - Enable standard looping (has no effect when infiniteLoop is true)
+   * @param {boolean} config.infiniteLoop - Enable true infinite sliding with cloned slides
    * @param {number} config.speed - Transition speed in milliseconds
    * @param {Object} config.slidesPerView - Number of slides to show based on viewport
    *    Example: { default: 1, 768: 2, 1024: 3 }
@@ -22,6 +24,7 @@ class PCarousel {
       nextButton: null,
       prevButton: null,
       loop: false,
+      infiniteLoop: false,
       speed: 300,
       slidesPerView: { default: 1 },
       gap: 0,
@@ -77,13 +80,22 @@ class PCarousel {
       container,
       wrapper,
       slides: Array.from(slides),
-      currentIndex: 0
+      originalSlides: Array.from(slides), // Store original slides for reference
+      currentIndex: 0,
+      isInfinite: this.config.infiniteLoop,
+      clonedSlides: [], // Track cloned slides
+      realSlidesOffset: 0 // Offset for the real slides when using infiniteLoop
     };
     
     this.state.carousels.push(carouselData);
     
     // Apply initial styles
     this._applyStyles(carouselData);
+    
+    // Handle infinite loop setup if enabled
+    if (this.config.infiniteLoop) {
+      this._setupInfiniteLoop(carouselData);
+    }
     
     // Calculate slide dimensions
     this._calculateDimensions(carouselData);
@@ -93,6 +105,82 @@ class PCarousel {
     
     // Add touch support
     this._initTouchEvents(carouselData);
+  }
+
+  /**
+   * Setup infinite loop by cloning slides and positioning them
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _setupInfiniteLoop(carouselData) {
+    const { wrapper, slides, originalSlides } = carouselData;
+    
+    // First, clear any existing clones to avoid duplicates on reinit
+    this._clearClonedSlides(carouselData);
+    
+    // Determine how many slides to clone based on slidesPerView
+    // We'll get the maximum possible slidesPerView value from all breakpoints
+    const breakpointValues = Object.values(this.config.slidesPerView);
+    const maxSlidesPerView = Math.max(...breakpointValues);
+    
+    // Clone enough slides to ensure smooth infinite scrolling
+    // We need at least maxSlidesPerView slides at each end
+    // Add a buffer of slidesToMove for smoother experience
+    const cloneCount = maxSlidesPerView + this.config.slidesToMove;
+    
+    // Clone beginning slides and append to the end
+    const beginClones = [];
+    for (let i = 0; i < cloneCount; i++) {
+      const slideIndex = i % originalSlides.length;
+      const clone = originalSlides[slideIndex].cloneNode(true);
+      clone.setAttribute('data-pcar-clone', 'end');
+      clone.setAttribute('data-pcar-original-index', slideIndex);
+      wrapper.appendChild(clone);
+      beginClones.push(clone);
+    }
+    
+    // Clone ending slides and prepend to the beginning
+    const endClones = [];
+    for (let i = 0; i < cloneCount; i++) {
+      const slideIndex = (originalSlides.length - 1 - i) % originalSlides.length;
+      const clone = originalSlides[slideIndex].cloneNode(true);
+      clone.setAttribute('data-pcar-clone', 'start');
+      clone.setAttribute('data-pcar-original-index', slideIndex);
+      wrapper.insertBefore(clone, wrapper.firstChild);
+      endClones.push(clone);
+    }
+    
+    // Store cloned slides and update the offset
+    carouselData.clonedSlides = [...endClones, ...beginClones];
+    carouselData.realSlidesOffset = endClones.length;
+    
+    // Update slides array to include clones
+    carouselData.slides = Array.from(wrapper.querySelectorAll('.pcar-slides'));
+    
+    // Set the initial position to the first real slide (after the clones)
+    carouselData.currentIndex = carouselData.realSlidesOffset;
+  }
+
+  /**
+   * Clear cloned slides from the carousel
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _clearClonedSlides(carouselData) {
+    const { wrapper, clonedSlides } = carouselData;
+    
+    if (clonedSlides && clonedSlides.length) {
+      clonedSlides.forEach(clone => {
+        if (clone.parentNode === wrapper) {
+          wrapper.removeChild(clone);
+        }
+      });
+      
+      carouselData.clonedSlides = [];
+    }
+    
+    // Reset slides to original slides
+    carouselData.slides = [...carouselData.originalSlides];
   }
 
   /**
@@ -158,7 +246,10 @@ class PCarousel {
     // Total gap space = gap × (slidesPerView - 1)
     const totalGapSpace = this.config.gap * (slidesPerView - 1);
     carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
-    carouselData.totalSlides = slides.length;
+    
+    // Set total slides count
+    // For infinite loop, this is the count of original slides, not including clones
+    carouselData.totalSlides = carouselData.originalSlides.length;
     
     // Set slide widths
     slides.forEach(slide => {
@@ -167,6 +258,12 @@ class PCarousel {
     
     // Store the gap value for position calculations
     carouselData.gap = this.config.gap;
+    
+    // Check if we need to update infinite loop setup on resize
+    if (carouselData.isInfinite) {
+      // We might need to add or remove clones based on the new slidesPerView
+      this._setupInfiniteLoop(carouselData);
+    }
     
     // Position slides initially
     this._positionSlides(carouselData);
@@ -188,6 +285,51 @@ class PCarousel {
   }
 
   /**
+   * Check if we need to reset position for infinite loop
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _checkInfiniteLoopReset(carouselData) {
+    if (!carouselData.isInfinite) return;
+    
+    const { currentIndex, realSlidesOffset, totalSlides, wrapper } = carouselData;
+    
+    // Calculate the threshold points for reset
+    const endThreshold = realSlidesOffset + totalSlides;
+    
+    // If we've scrolled past the cloned slides at the start
+    if (currentIndex < realSlidesOffset) {
+      // Disable transition temporarily
+      wrapper.style.transition = 'none';
+      
+      // Jump to the corresponding real slide from the end
+      carouselData.currentIndex = endThreshold - (realSlidesOffset - currentIndex);
+      this._positionSlides(carouselData);
+      
+      // Force browser reflow to make the jump instantaneous
+      void wrapper.offsetWidth;
+      
+      // Re-enable transition
+      wrapper.style.transition = `transform ${this.config.speed}ms ease`;
+    }
+    // If we've scrolled past the cloned slides at the end
+    else if (currentIndex >= endThreshold) {
+      // Disable transition temporarily
+      wrapper.style.transition = 'none';
+      
+      // Jump to the corresponding real slide from the beginning
+      carouselData.currentIndex = realSlidesOffset + (currentIndex - endThreshold);
+      this._positionSlides(carouselData);
+      
+      // Force browser reflow to make the jump instantaneous
+      void wrapper.offsetWidth;
+      
+      // Re-enable transition
+      wrapper.style.transition = `transform ${this.config.speed}ms ease`;
+    }
+  }
+
+  /**
    * Initialize navigation buttons
    * @param {Object} carouselData - Data for a specific carousel
    * @private
@@ -198,7 +340,7 @@ class PCarousel {
     // Next button
     if (this.config.nextButton) {
       const nextBtn = container.querySelector(this.config.nextButton) || 
-                       document.querySelector(this.config.nextButton);
+                      document.querySelector(this.config.nextButton);
       
       if (nextBtn) {
         nextBtn.addEventListener('click', () => {
@@ -210,7 +352,7 @@ class PCarousel {
     // Previous button
     if (this.config.prevButton) {
       const prevBtn = container.querySelector(this.config.prevButton) || 
-                       document.querySelector(this.config.prevButton);
+                      document.querySelector(this.config.prevButton);
       
       if (prevBtn) {
         prevBtn.addEventListener('click', () => {
@@ -255,10 +397,10 @@ class PCarousel {
       moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
       const diff = moveX - startX;
       
-      // Determine boundaries based on loop mode
+      // Determine boundaries based on loop/infiniteLoop mode
       let adjustedDiff = diff;
       
-      if (!this.config.loop) {
+      if (!carouselData.isInfinite && !this.config.loop) {
         const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
         
         // Restrict dragging past the first slide (left boundary)
@@ -290,16 +432,17 @@ class PCarousel {
       
       const diff = endX - startX;
       
-      // Check if we're at a boundary and not in loop mode
+      // Check if we're at a boundary and not in loop/infiniteLoop mode
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      const isAtStart = carouselData.currentIndex === 0;
-      const isAtEnd = carouselData.currentIndex === maxIndex;
+      const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
+      const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? 
+        carouselData.realSlidesOffset + maxIndex : maxIndex);
       
-      // If swipe distance is enough and we're not at a boundary (or we're in loop mode)
+      // If swipe distance is enough and we're not at a boundary (or we're in loop/infiniteLoop mode)
       if (Math.abs(diff) > 50) {
-        if (diff > 0 && (!isAtStart || this.config.loop)) {
+        if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
           this.prev(container);
-        } else if (diff < 0 && (!isAtEnd || this.config.loop)) {
+        } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
           this.next(container);
         } else {
           // Reset to current position if we're at a boundary and not in loop mode
@@ -370,26 +513,39 @@ class PCarousel {
     
     carouselData.isAnimating = true;
     
-    const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
     // Get how many slides to move
     const slidesToMove = this.config.slidesToMove;
     
-    if (carouselData.currentIndex + slidesToMove > maxIndex) {
-      if (this.config.loop) {
-        // If loop mode is enabled, go back to the first slide
-        carouselData.currentIndex = 0;
-      } else {
-        // Otherwise, go to the last possible index without exceeding
-        carouselData.currentIndex = maxIndex;
-        carouselData.isAnimating = false;
-        return this;
-      }
-    } else {
-      // Move by configured number of slides
+    if (carouselData.isInfinite) {
+      // In infinite loop mode, we can always move forward
       carouselData.currentIndex += slidesToMove;
+    } else {
+      const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+      
+      if (carouselData.currentIndex + slidesToMove > maxIndex) {
+        if (this.config.loop) {
+          // If loop mode is enabled, go back to the first slide
+          carouselData.currentIndex = 0;
+        } else {
+          // Otherwise, go to the last possible index without exceeding
+          carouselData.currentIndex = maxIndex;
+          carouselData.isAnimating = false;
+          return this;
+        }
+      } else {
+        // Move by configured number of slides
+        carouselData.currentIndex += slidesToMove;
+      }
     }
     
     this._positionSlides(carouselData);
+    
+    // Check if we need to reset for infinite loop
+    if (carouselData.isInfinite) {
+      setTimeout(() => {
+        this._checkInfiniteLoopReset(carouselData);
+      }, this.config.speed);
+    }
     
     // Reset animation flag after transition is complete
     setTimeout(() => {
@@ -414,22 +570,34 @@ class PCarousel {
     // Get how many slides to move
     const slidesToMove = this.config.slidesToMove;
     
-    if (carouselData.currentIndex - slidesToMove < 0) {
-      if (this.config.loop) {
-        // If loop mode is enabled, go to the last slide
-        carouselData.currentIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      } else {
-        // Otherwise, stay at the first slide
-        carouselData.currentIndex = 0;
-        carouselData.isAnimating = false;
-        return this;
-      }
-    } else {
-      // Move back by configured number of slides
+    if (carouselData.isInfinite) {
+      // In infinite loop mode, we can always move backward
       carouselData.currentIndex -= slidesToMove;
+    } else {
+      if (carouselData.currentIndex - slidesToMove < 0) {
+        if (this.config.loop) {
+          // If loop mode is enabled, go to the last slide
+          carouselData.currentIndex = carouselData.totalSlides - carouselData.slidesPerView;
+        } else {
+          // Otherwise, stay at the first slide
+          carouselData.currentIndex = 0;
+          carouselData.isAnimating = false;
+          return this;
+        }
+      } else {
+        // Move back by configured number of slides
+        carouselData.currentIndex -= slidesToMove;
+      }
     }
     
     this._positionSlides(carouselData);
+    
+    // Check if we need to reset for infinite loop
+    if (carouselData.isInfinite) {
+      setTimeout(() => {
+        this._checkInfiniteLoopReset(carouselData);
+      }, this.config.speed);
+    }
     
     // Reset animation flag after transition is complete
     setTimeout(() => {
@@ -454,13 +622,21 @@ class PCarousel {
     
     const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
     
+    // Adjust index for infinite loop to account for cloned slides
+    let targetIndex = index;
+    if (carouselData.isInfinite) {
+      targetIndex = index + carouselData.realSlidesOffset;
+    }
+    
     // Ensure index is within bounds
-    if (index < 0) {
-      carouselData.currentIndex = 0;
-    } else if (index > maxIndex) {
-      carouselData.currentIndex = maxIndex;
+    if (targetIndex < (carouselData.isInfinite ? carouselData.realSlidesOffset : 0)) {
+      carouselData.currentIndex = carouselData.isInfinite ? carouselData.realSlidesOffset : 0;
+    } else if (targetIndex > (carouselData.isInfinite ? 
+      carouselData.realSlidesOffset + maxIndex : maxIndex)) {
+      carouselData.currentIndex = carouselData.isInfinite ? 
+        carouselData.realSlidesOffset + maxIndex : maxIndex;
     } else {
-      carouselData.currentIndex = index;
+      carouselData.currentIndex = targetIndex;
     }
     
     this._positionSlides(carouselData);
@@ -468,6 +644,11 @@ class PCarousel {
     // Reset animation flag after transition is complete
     setTimeout(() => {
       carouselData.isAnimating = false;
+      
+      // Check for infinite loop reset
+      if (carouselData.isInfinite) {
+        this._checkInfiniteLoopReset(carouselData);
+      }
     }, this.config.speed);
     
     return this;
@@ -479,13 +660,38 @@ class PCarousel {
    * @returns {PCarousel} - Returns the carousel instance for chaining
    */
   updateConfig(newConfig) {
+    const oldConfig = {...this.config};
     this.config = {
       ...this.config,
       ...newConfig
     };
     
+    // Check if infiniteLoop setting changed
+    const infiniteLoopChanged = oldConfig.infiniteLoop !== this.config.infiniteLoop;
+    
     // Reinitialize carousels with new config
     this.state.carousels.forEach(carouselData => {
+      // Update infinite loop state
+      if (infiniteLoopChanged) {
+        carouselData.isInfinite = this.config.infiniteLoop;
+        
+        if (carouselData.isInfinite) {
+          // If enabling infinite loop, set it up
+          this._setupInfiniteLoop(carouselData);
+        } else {
+          // If disabling infinite loop, clean up cloned slides
+          this._clearClonedSlides(carouselData);
+          
+          // Reset index to appropriate position
+          carouselData.currentIndex = Math.min(
+            carouselData.currentIndex - carouselData.realSlidesOffset,
+            carouselData.totalSlides - carouselData.slidesPerView
+          );
+          carouselData.currentIndex = Math.max(0, carouselData.currentIndex);
+          carouselData.realSlidesOffset = 0;
+        }
+      }
+      
       this._applyStyles(carouselData);
       this._calculateDimensions(carouselData);
     });
@@ -502,6 +708,11 @@ class PCarousel {
     this.state.carousels.forEach(carouselData => {
       const { container, wrapper, slides, eventHandlers } = carouselData;
       
+      // Clear cloned slides if infinite loop was enabled
+      if (carouselData.isInfinite) {
+        this._clearClonedSlides(carouselData);
+      }
+      
       // Remove styles
       container.style.overflow = '';
       container.style.position = '';
@@ -515,6 +726,7 @@ class PCarousel {
       slides.forEach(slide => {
         slide.style.flexShrink = '';
         slide.style.width = '';
+        slide.style.marginRight = '';
       });
       
       // Properly remove event listeners if available

@@ -1,6 +1,6 @@
 {
   "name": "swipix",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Swipix is a customizable, feature-rich JavaScript carousel library that enables developers to create responsive, touch-enabled slider components with various configuration options. The library supports standard carousel functionality along with advanced features such as infinite looping, tabs integration, and responsive breakpoints.",
   "main": "dist/swipix.cjs.js",
   "module": "dist/swipix.esm.js",

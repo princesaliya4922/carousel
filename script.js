@@ -56,6 +56,7 @@ class Swipix {
   init(containerSelector = null) {
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
+
     containers.forEach(container => {
       // If lazyPix is enabled, delay initialization using an observer.
       if (this.config.lazyPix) {
@@ -73,12 +74,6 @@ class Swipix {
     return this;
   }
 
-  /**
-   * Observe the container for lazy initialization using lazyPixOffset.
-   * When container is within offset of viewport, initialize it.
-   * @param {HTMLElement} container 
-   * @private
-   */
   _observeInit(container) {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -97,6 +92,10 @@ class Swipix {
     if (!wrapper || slides.length === 0) {
       console.error('Carousel structure is invalid. Ensure you have .pix-wrapper and .pix-slide elements.');
       return;
+    }
+    // If infiniteLoop is enabled, hide the container initially to prevent the flash of cloned slides.
+    if (this.config.infiniteLoop) {
+      container.style.visibility = 'hidden';
     }
     const originalSlides = Array.from(slides).map((slide, index) => {
       slide.setAttribute('data-swipix-index', index);
@@ -122,6 +121,15 @@ class Swipix {
       this._setupInfiniteLoop(carouselData);
     }
     this._calculateDimensions(carouselData);
+    // Disable transition temporarily, position slides, force reflow, then restore transition.
+    carouselData.wrapper.style.transition = 'none';
+    this._positionSlides(carouselData);
+    void carouselData.wrapper.offsetWidth;
+    carouselData.wrapper.style.transition = `transform ${this.config.speed}ms ease`;
+    // Reveal the container once positioning is complete.
+    if (this.config.infiniteLoop) {
+      container.style.visibility = 'visible';
+    }
     this._initNavigation(carouselData);
     this._initTouchEvents(carouselData);
     if (this.config.tabsConfig) {
@@ -373,7 +381,7 @@ class Swipix {
   }
 
   _positionSlides(carouselData) {
-    const { wrapper, currentIndex, slideWidth, gap, container } = carouselData;
+    const { wrapper, currentIndex, slideWidth, gap } = carouselData;
     const translateX = -currentIndex * (slideWidth + gap);
     wrapper.style.transform = `translateX(${translateX}px)`;
     if (this.config.lazyMedia && carouselData.isVisible) {
@@ -522,9 +530,7 @@ class Swipix {
     }
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
-      setTimeout(() => {
-        this._checkInfiniteLoopReset(carouselData);
-      }, this.config.speed);
+      setTimeout(() => { this._checkInfiniteLoopReset(carouselData); }, this.config.speed);
     }
     setTimeout(() => {
       carouselData.isAnimating = false;
@@ -559,9 +565,7 @@ class Swipix {
     }
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
-      setTimeout(() => {
-        this._checkInfiniteLoopReset(carouselData);
-      }, this.config.speed);
+      setTimeout(() => { this._checkInfiniteLoopReset(carouselData); }, this.config.speed);
     }
     setTimeout(() => {
       carouselData.isAnimating = false;
@@ -622,9 +626,7 @@ class Swipix {
     carouselData.currentIndex = targetIndex;
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
-      setTimeout(() => {
-        this._checkInfiniteLoopReset(carouselData);
-      }, this.config.speed);
+      setTimeout(() => { this._checkInfiniteLoopReset(carouselData); }, this.config.speed);
     }
     setTimeout(() => {
       carouselData.isAnimating = false;

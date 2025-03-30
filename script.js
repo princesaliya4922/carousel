@@ -13,15 +13,17 @@ class Swipix {
    * @param {boolean} config.loop - Enable standard looping (has no effect when infiniteLoop is true)
    * @param {boolean} config.infiniteLoop - Enable true infinite sliding with cloned slides
    * @param {number} config.speed - Transition speed in milliseconds
-   * @param {Object} config.slidesPerView - Number of slides to show based on viewport (e.g., { default: 1, 768: 2, 1024: 3 })
+   * @param {Object} config.slidesPerView - Number of slides to show based on viewport 
+   *     (e.g., { default: 1, 768: 2, 1024: 3 })
    * @param {number} config.gap - Gap between slides in pixels
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
    * @param {Object|Array} [config.tabsConfig] - Optional configuration for tab buttons.
-   * @param {Object} [config.autoplay] - Autoplay configuration: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
-   * @param {boolean} [config.lazyMedia] - When true, media inside slides (img/video with data-src) will be lazy loaded when visible.
+   * @param {Object} [config.autoplay] - Autoplay configuration: 
+   *     { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
+   * @param {boolean} [config.lazyMedia] - When true, media inside slides (img/video with data-src) will be lazy loaded.
    * @param {number} [config.lazyMediaOffset] - Offset in pixels for triggering lazy media load (default: 100).
    * @param {boolean} [config.lazyPix] - When true, the carousel will not initialize until its container is near the viewport.
-   * @param {number} [config.lazyPixOffset] - Offset in pixels used with IntersectionObserver to trigger lazy initialization (default: 150).
+   * @param {number} [config.lazyPixOffset] - Offset in pixels (default: 150).
    */
   constructor(config) {
     this.config = {
@@ -56,9 +58,7 @@ class Swipix {
   init(containerSelector = null) {
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
-
     containers.forEach(container => {
-      // If lazyPix is enabled, delay initialization using an observer.
       if (this.config.lazyPix) {
         this._observeInit(container);
       } else {
@@ -93,7 +93,7 @@ class Swipix {
       console.error('Carousel structure is invalid. Ensure you have .pix-wrapper and .pix-slide elements.');
       return;
     }
-    // If infiniteLoop is enabled, hide the container initially to prevent the flash of cloned slides.
+    // Hide container initially to avoid showing clones during setup.
     if (this.config.infiniteLoop) {
       container.style.visibility = 'hidden';
     }
@@ -121,12 +121,14 @@ class Swipix {
       this._setupInfiniteLoop(carouselData);
     }
     this._calculateDimensions(carouselData);
-    // Disable transition temporarily, position slides, force reflow, then restore transition.
+    // Disable transition temporarily to jump to the correct position without animation.
     carouselData.wrapper.style.transition = 'none';
     this._positionSlides(carouselData);
+    // Force reflow.
     void carouselData.wrapper.offsetWidth;
+    // Restore transition.
     carouselData.wrapper.style.transition = `transform ${this.config.speed}ms ease`;
-    // Reveal the container once positioning is complete.
+    // Reveal container after proper positioning.
     if (this.config.infiniteLoop) {
       container.style.visibility = 'visible';
     }
@@ -232,9 +234,7 @@ class Swipix {
       buttons = Array.from(buttons);
       buttons.forEach((btn, index) => {
         btn.addEventListener('click', () => {
-          let targetSlide = config.mapping && Array.isArray(config.mapping)
-            ? config.mapping[index]
-            : index;
+          let targetSlide = config.mapping && Array.isArray(config.mapping) ? config.mapping[index] : index;
           if (targetSlide < 0 || targetSlide >= carouselData.totalSlides) {
             console.warn(`Mapping for tab index ${index} is out-of-bound.`);
             return;
@@ -242,11 +242,7 @@ class Swipix {
           this.slideTo(carouselData.container, targetSlide);
         });
       });
-      carouselData.tabGroups.push({
-        container: tabsContainer,
-        buttons: buttons,
-        config: config
-      });
+      carouselData.tabGroups.push({ container: tabsContainer, buttons, config });
       this._updateTabsActiveGroup(carouselData, config, buttons);
     });
   }
@@ -273,22 +269,12 @@ class Swipix {
         }
       }
       buttons.forEach((btn, i) => {
-        if (i === selectedTab) {
-          btn.classList.add(activeClass);
-        } else {
-          btn.classList.remove(activeClass);
-        }
+        if (i === selectedTab) { btn.classList.add(activeClass); } else { btn.classList.remove(activeClass); }
       });
     } else {
       buttons.forEach((btn, i) => {
-        let mappedSlide = config.mapping && Array.isArray(config.mapping)
-          ? config.mapping[i]
-          : i;
-        if (mappedSlide === activeIndex) {
-          btn.classList.add(activeClass);
-        } else {
-          btn.classList.remove(activeClass);
-        }
+        let mappedSlide = config.mapping && Array.isArray(config.mapping) ? config.mapping[i] : i;
+        if (mappedSlide === activeIndex) { btn.classList.add(activeClass); } else { btn.classList.remove(activeClass); }
       });
     }
   }
@@ -411,19 +397,17 @@ class Swipix {
   _initNavigation(carouselData) {
     const { container } = carouselData;
     if (this.config.nextButton) {
-      const nextBtn = container.querySelector(this.config.nextButton) || document.querySelector(this.config.nextButton);
+      const nextBtn = container.querySelector(this.config.nextButton) ||
+                      document.querySelector(this.config.nextButton);
       if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-          this.next(container);
-        });
+        nextBtn.addEventListener('click', () => { this.next(container); });
       }
     }
     if (this.config.prevButton) {
-      const prevBtn = container.querySelector(this.config.prevButton) || document.querySelector(this.config.prevButton);
+      const prevBtn = container.querySelector(this.config.prevButton) ||
+                      document.querySelector(this.config.prevButton);
       if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-          this.prev(container);
-        });
+        prevBtn.addEventListener('click', () => { this.prev(container); });
       }
     }
   }
@@ -608,7 +592,7 @@ class Swipix {
     }, this.config.speed);
     return this;
   }
-  
+
   slideTo(container, index) {
     if (typeof container === 'number') {
       index = container;

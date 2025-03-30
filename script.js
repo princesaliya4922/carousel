@@ -1,7 +1,7 @@
 /**
  * Swipix - A customizable carousel library
  * Supports infinite looping, built-in tabs (with optional range mapping and multiple tab groups),
- * and autoplay with pause on interaction.
+ * autoplay with pause on interaction, and media lazy loading with an offset.
  */
 class Swipix {
   /**
@@ -18,9 +18,10 @@ class Swipix {
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
    * @param {Object|Array} [config.tabsConfig] - Optional configuration for tab buttons.
    * @param {Object} [config.autoplay] - Autoplay configuration: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
+   * @param {boolean} [config.lazyMedia] - When true, media inside slides (img/video with data-src) will be lazy loaded only when near/within the viewport.
+   * @param {number} [config.lazyMediaOffset] - The offset (in pixels) used with IntersectionObserver to trigger lazy loading (default: 100).
    */
   constructor(config) {
-    // Default configuration (including autoplay defaults)
     this.config = {
       container: '.pix-container',
       nextButton: null,
@@ -32,10 +33,11 @@ class Swipix {
       gap: 0,
       slidesToMove: 1,
       autoplay: { enabled: false, delay: 3000, pauseOnInteraction: false, pauseAfterInteraction: false },
+      lazyMedia: false,
+      lazyMediaOffset: 100,
       ...config
     };
 
-    // Internal state
     this.state = {
       currentIndex: 0,
       totalSlides: 0,
@@ -47,92 +49,68 @@ class Swipix {
     };
   }
 
-  /**
-   * Initialize the carousel.
-   * @param {string} containerSelector - Optional container selector to override config.
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   init(containerSelector = null) {
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
-
     containers.forEach(container => {
       this._initSingleCarousel(container);
     });
-
     window.addEventListener('resize', this._handleResize.bind(this));
-
-    // Start autoplay for each carousel if enabled.
     if (this.config.autoplay.enabled) {
       this.state.carousels.forEach(carouselData => {
         this._setupAutoplay(carouselData);
       });
     }
-
     return this;
   }
 
-  /**
-   * Initialize a single carousel container.
-   * @param {HTMLElement} container - The carousel container element.
-   * @private
-   */
   _initSingleCarousel(container) {
     const wrapper = container.querySelector('.pix-wrapper');
     const slides = container.querySelectorAll('.pix-slide');
-
     if (!wrapper || slides.length === 0) {
       console.error('Carousel structure is invalid. Ensure you have .pix-wrapper and .pix-slide elements.');
       return;
     }
-
     const originalSlides = Array.from(slides).map((slide, index) => {
       slide.setAttribute('data-swipix-index', index);
       return slide;
     });
-
     const carouselData = {
       container,
       wrapper,
       slides: Array.from(slides),
-      originalSlides, // Store original slides for reference
+      originalSlides,
       currentIndex: 0,
       isInfinite: this.config.infiniteLoop,
       clonedSlides: [],
       realSlidesOffset: 0,
       autoplayInterval: null,
       autoplayHandlers: null,
-      tabGroups: [] // For multiple tab groups support
+      tabGroups: [],
+      isVisible: false
     };
-
     this.state.carousels.push(carouselData);
-
     this._applyStyles(carouselData);
-
     if (this.config.infiniteLoop) {
       this._setupInfiniteLoop(carouselData);
     }
-
     this._calculateDimensions(carouselData);
     this._initNavigation(carouselData);
     this._initTouchEvents(carouselData);
-
     if (this.config.tabsConfig) {
       this._initTabsGroups(carouselData);
     }
-
-    // Attach pause/resume events based on autoplay settings.
+    if (this.config.lazyMedia) {
+      this._observeVisibility(carouselData);
+    }
     if (this.config.autoplay.enabled && this.config.autoplay.pauseOnInteraction) {
-      // If pauseAfterInteraction is true, then only attach a pause event.
       const pauseHandler = () => {
         this._pauseAutoplay(carouselData);
         if (this.config.autoplay.pauseAfterInteraction) {
-          // Remove the event listeners so autoplay never resumes.
           carouselData.container.removeEventListener('mouseleave', resumeHandler);
         }
       };
       const resumeHandler = () => {
-        // Only resume if pauseAfterInteraction is false.
         if (!this.config.autoplay.pauseAfterInteraction) {
           this._startAutoplay(carouselData);
         }
@@ -143,44 +121,56 @@ class Swipix {
     }
   }
 
-  /**
-   * Setup autoplay for a carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
+  _observeVisibility(carouselData) {
+    const container = carouselData.container;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        carouselData.isVisible = entry.isIntersecting;
+        if (entry.isIntersecting && this.config.lazyMedia) {
+          this._lazyLoadMedia(carouselData);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: `${this.config.lazyMediaOffset}px` });
+    observer.observe(container);
+    carouselData.visibilityObserver = observer;
+  }
+
   _setupAutoplay(carouselData) {
     this._startAutoplay(carouselData);
   }
 
-  /**
-   * Start autoplay for a carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _startAutoplay(carouselData) {
-    // Always clear any existing autoplay interval.
     this._pauseAutoplay(carouselData);
     carouselData.autoplayInterval = setInterval(() => {
       this.next(carouselData.container);
     }, this.config.autoplay.delay);
   }
 
-  /**
-   * Pause autoplay for a carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _pauseAutoplay(carouselData) {
     clearInterval(carouselData.autoplayInterval);
     carouselData.autoplayInterval = null;
   }
 
-  /**
-   * Initialize tab groups based on tabsConfig.
-   * Accepts a single object or an array of objects.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
+  _lazyLoadMedia(carouselData) {
+    if (!carouselData.isVisible) return;
+    const start = carouselData.currentIndex;
+    const end = start + carouselData.slidesPerView;
+    const visibleSlides = carouselData.slides.slice(start, end);
+    visibleSlides.forEach(slide => {
+      const mediaElements = slide.querySelectorAll('img[data-src], video[data-src]');
+      mediaElements.forEach(media => {
+        const dataSrc = media.getAttribute('data-src');
+        if (dataSrc && !media.getAttribute('src')) {
+          media.setAttribute('src', dataSrc);
+          media.removeAttribute('data-src');
+          if (media.tagName.toLowerCase() === 'video') {
+            media.load();
+          }
+        }
+      });
+    });
+  }
+
   _initTabsGroups(carouselData) {
     const tabsConfigOption = this.config.tabsConfig;
     let tabConfigs = [];
@@ -191,9 +181,7 @@ class Swipix {
     } else {
       return;
     }
-
     carouselData.tabGroups = [];
-
     tabConfigs.forEach(config => {
       const tabsContainer = document.querySelector(config.container);
       if (!tabsContainer) {
@@ -207,7 +195,6 @@ class Swipix {
         buttons = tabsContainer.children;
       }
       buttons = Array.from(buttons);
-
       buttons.forEach((btn, index) => {
         btn.addEventListener('click', () => {
           let targetSlide = config.mapping && Array.isArray(config.mapping)
@@ -220,22 +207,15 @@ class Swipix {
           this.slideTo(carouselData.container, targetSlide);
         });
       });
-
       carouselData.tabGroups.push({
         container: tabsContainer,
         buttons: buttons,
         config: config
       });
-
       this._updateTabsActiveGroup(carouselData, config, buttons);
     });
   }
 
-  /**
-   * Update active tab state for all tab groups of a carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _updateTabsActive(carouselData) {
     if (!carouselData.tabGroups) return;
     carouselData.tabGroups.forEach(group => {
@@ -243,13 +223,6 @@ class Swipix {
     });
   }
 
-  /**
-   * Update active state for a single tab group.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @param {Object} config - The tab group configuration.
-   * @param {Array} buttons - Array of button elements in this tab group.
-   * @private
-   */
   _updateTabsActiveGroup(carouselData, config, buttons) {
     let activeIndex = carouselData.currentIndex;
     if (carouselData.isInfinite) {
@@ -257,7 +230,6 @@ class Swipix {
     }
     activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
     const activeClass = config.activeClass || 'active';
-
     if (config.rangeMapping && Array.isArray(config.mapping) && config.mapping.length > 0) {
       let selectedTab = 0;
       for (let i = 0; i < config.mapping.length; i++) {
@@ -286,11 +258,6 @@ class Swipix {
     }
   }
 
-  /**
-   * Setup infinite loop by cloning slides and positioning them.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _setupInfiniteLoop(carouselData) {
     const { wrapper, originalSlides } = carouselData;
     this._clearClonedSlides(carouselData);
@@ -321,11 +288,6 @@ class Swipix {
     carouselData.currentIndex = carouselData.realSlidesOffset;
   }
 
-  /**
-   * Clear cloned slides from the carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _clearClonedSlides(carouselData) {
     const { wrapper, clonedSlides } = carouselData;
     if (clonedSlides && clonedSlides.length) {
@@ -339,11 +301,6 @@ class Swipix {
     carouselData.slides = [...carouselData.originalSlides];
   }
 
-  /**
-   * Apply necessary styles to carousel elements.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _applyStyles(carouselData) {
     const { container, wrapper, slides } = carouselData;
     container.style.overflow = 'hidden';
@@ -359,11 +316,6 @@ class Swipix {
     });
   }
 
-  /**
-   * Calculate dimensions for the carousel.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _calculateDimensions(carouselData) {
     const { container, slides } = carouselData;
     const viewportWidth = window.innerWidth;
@@ -393,22 +345,15 @@ class Swipix {
     this._positionSlides(carouselData);
   }
 
-  /**
-   * Position slides based on the current index.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _positionSlides(carouselData) {
-    const { wrapper, currentIndex, slideWidth, gap } = carouselData;
+    const { wrapper, currentIndex, slideWidth, gap, container } = carouselData;
     const translateX = -currentIndex * (slideWidth + gap);
     wrapper.style.transform = `translateX(${translateX}px)`;
+    if (this.config.lazyMedia && carouselData.isVisible) {
+      this._lazyLoadMedia(carouselData);
+    }
   }
 
-  /**
-   * Check if we need to reset position for infinite loop.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _checkInfiniteLoopReset(carouselData) {
     if (!carouselData.isInfinite) return;
     const { currentIndex, realSlidesOffset, totalSlides, wrapper } = carouselData;
@@ -428,11 +373,6 @@ class Swipix {
     }
   }
 
-  /**
-   * Initialize navigation buttons.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _initNavigation(carouselData) {
     const { container } = carouselData;
     if (this.config.nextButton) {
@@ -453,16 +393,10 @@ class Swipix {
     }
   }
 
-  /**
-   * Initialize touch and mouse drag events for swipe functionality.
-   * @param {Object} carouselData - Data for a specific carousel.
-   * @private
-   */
   _initTouchEvents(carouselData) {
     const { container, wrapper } = carouselData;
     let startX, moveX, isDragging = false;
     let initialTransform = 0;
-
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
@@ -475,7 +409,6 @@ class Swipix {
       wrapper.style.transition = 'none';
       wrapper.style.cursor = 'grabbing';
     };
-
     const handleDragMove = (e) => {
       if (!isDragging) return;
       moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
@@ -488,7 +421,6 @@ class Swipix {
       }
       wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
     };
-
     const handleDragEnd = (e) => {
       if (!isDragging) return;
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
@@ -517,7 +449,6 @@ class Swipix {
       });
       document.dispatchEvent(event);
     };
-
     container.addEventListener('touchstart', handleDragStart, { passive: false });
     container.addEventListener('touchmove', handleDragMove, { passive: true });
     container.addEventListener('touchend', handleDragEnd);
@@ -525,29 +456,15 @@ class Swipix {
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
     wrapper.style.cursor = 'grab';
-    carouselData.eventHandlers = {
-      handleDragStart,
-      handleDragMove,
-      handleDragEnd
-    };
+    carouselData.eventHandlers = { handleDragStart, handleDragMove, handleDragEnd };
   }
 
-  /**
-   * Handle window resize event.
-   * @private
-   */
   _handleResize() {
     this.state.carousels.forEach(carouselData => {
       this._calculateDimensions(carouselData);
     });
   }
 
-  /**
-   * Get carousel data for a specific container.
-   * @param {HTMLElement|string} container - Container element or selector.
-   * @returns {Object|null} - Carousel data or null if not found.
-   * @private
-   */
   _getCarouselData(container) {
     if (typeof container === 'string') {
       container = document.querySelector(container);
@@ -555,11 +472,6 @@ class Swipix {
     return this.state.carousels.find(data => data.container === container) || null;
   }
 
-  /**
-   * Move to the next slide.
-   * @param {HTMLElement|string} container - Container element or selector.
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   next(container) {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
@@ -598,11 +510,6 @@ class Swipix {
     return this;
   }
 
-  /**
-   * Move to the previous slide.
-   * @param {HTMLElement|string} container - Container element or selector.
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   prev(container) {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
@@ -640,12 +547,6 @@ class Swipix {
     return this;
   }
 
-  /**
-   * Go to a specific slide by index (zero-based for real slides).
-   * @param {HTMLElement|string} container - Container element or selector.
-   * @param {number} index - Target slide index (zero-based for real slides).
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   goTo(container, index) {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
@@ -677,13 +578,6 @@ class Swipix {
     return this;
   }
   
-  /**
-   * Slide to a specific slide by index (zero-based for real slides).
-   * If called with a number only, uses the first carousel.
-   * @param {HTMLElement|string|number} container - Container element/selector or index if single carousel.
-   * @param {number} [index] - Target slide index if container is provided.
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   slideTo(container, index) {
     if (typeof container === 'number') {
       index = container;
@@ -716,14 +610,7 @@ class Swipix {
     return this;
   }
 
-  /**
-   * Update carousel configuration.
-   * Reinitializes autoplay with new delay and reattaches pause/resume events.
-   * @param {Object} newConfig - New configuration options.
-   * @returns {Swipix} - Returns the carousel instance for chaining.
-   */
   updateConfig(newConfig) {
-    // Update autoplay separately with a deep merge.
     if (newConfig.autoplay) {
       this.config.autoplay = {
         enabled: newConfig.autoplay.enabled !== undefined ? newConfig.autoplay.enabled : this.config.autoplay.enabled,
@@ -734,9 +621,7 @@ class Swipix {
       delete newConfig.autoplay;
     }
     this.config = { ...this.config, ...newConfig };
-
     this.state.carousels.forEach(carouselData => {
-      // Reinitialize infinite loop if changed.
       if (this.config.infiniteLoop !== carouselData.isInfinite) {
         carouselData.isInfinite = this.config.infiniteLoop;
         if (carouselData.isInfinite) {
@@ -756,24 +641,20 @@ class Swipix {
       if (this.config.tabsConfig) {
         this._initTabsGroups(carouselData);
       }
-      // Reinitialize autoplay.
       this._pauseAutoplay(carouselData);
       if (this.config.autoplay.enabled) {
         this._startAutoplay(carouselData);
       }
-      // Reattach pause/resume events.
       if (this.config.autoplay.enabled && this.config.autoplay.pauseOnInteraction) {
         if (carouselData.autoplayHandlers) {
           carouselData.container.removeEventListener('mouseenter', carouselData.autoplayHandlers.pauseHandler);
           carouselData.container.removeEventListener('mouseleave', carouselData.autoplayHandlers.resumeHandler);
         }
-        // If pauseAfterInteraction is true, attach only pause.
         if (this.config.autoplay.pauseAfterInteraction) {
           const pauseHandler = () => {
             this._pauseAutoplay(carouselData);
             carouselData.container.removeEventListener('mouseleave', resumeHandler);
           };
-          // Dummy resume handler to remove if exists.
           const resumeHandler = () => {};
           carouselData.autoplayHandlers = { pauseHandler, resumeHandler };
           carouselData.container.addEventListener('mouseenter', pauseHandler);
@@ -789,9 +670,6 @@ class Swipix {
     return this;
   }
 
-  /**
-   * Destroy the carousel instance and clean up event listeners.
-   */
   destroy() {
     window.removeEventListener('resize', this._handleResize.bind(this));
     this.state.carousels.forEach(carouselData => {
@@ -826,7 +704,6 @@ class Swipix {
   }
 }
 
-// Export the library.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Swipix;
 } else {

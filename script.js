@@ -53,6 +53,20 @@ class Swipix {
       slidesPerView: 1,
       carousels: []
     };
+
+    // Reference for the debounced resize function
+    this._debouncedResize = null;
+  }
+
+  // Helper: Debounce a function call with given delay.
+  _debounce(func, delay) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
   }
 
   init(containerSelector = null) {
@@ -65,7 +79,9 @@ class Swipix {
         this._initSingleCarousel(container);
       }
     });
-    window.addEventListener('resize', this._handleResize.bind(this));
+    // Use the debounced resize handler (100ms delay is an example)
+    this._debouncedResize = this._debounce(this._handleResize.bind(this), 100);
+    window.addEventListener('resize', this._debouncedResize);
     if (this.config.autoplay.enabled) {
       this.state.carousels.forEach(carouselData => {
         this._setupAutoplay(carouselData);
@@ -274,12 +290,14 @@ class Swipix {
         }
       }
       buttons.forEach((btn, i) => {
-        if (i === selectedTab) { btn.classList.add(activeClass); } else { btn.classList.remove(activeClass); }
+        if (i === selectedTab) { btn.classList.add(activeClass); }
+        else { btn.classList.remove(activeClass); }
       });
     } else {
       buttons.forEach((btn, i) => {
         let mappedSlide = config.mapping && Array.isArray(config.mapping) ? config.mapping[i] : i;
-        if (mappedSlide === activeIndex) { btn.classList.add(activeClass); } else { btn.classList.remove(activeClass); }
+        if (mappedSlide === activeIndex) { btn.classList.add(activeClass); }
+        else { btn.classList.remove(activeClass); }
       });
     }
   }
@@ -417,6 +435,7 @@ class Swipix {
     }
   }
 
+  // Drag functionality remains unchanged.
   _initTouchEvents(carouselData) {
     const { container, wrapper } = carouselData;
     let startX, moveX, isDragging = false;
@@ -689,7 +708,7 @@ class Swipix {
   }
 
   destroy() {
-    window.removeEventListener('resize', this._handleResize.bind(this));
+    window.removeEventListener('resize', this._debouncedResize);
     this.state.carousels.forEach(carouselData => {
       const { container, wrapper, slides, eventHandlers, resizeObserver } = carouselData;
       if (resizeObserver) { resizeObserver.disconnect(); }

@@ -10,9 +10,9 @@
     .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; }
     h1 { text-align: center; margin-bottom: 20px; }
     /* Tabs container styling */
-    .tabs-container { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
-    .tabs-container .tab-btn { padding: 10px 20px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; transition: background 0.3s; }
-    .tabs-container .tab-btn.active { background: #2196F3; color: #fff; }
+    .tabs-container, .tabs-container-2 { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+    .tabs-container .tab-btn, .tabs-container-2 .tab-btn-2 { padding: 10px 20px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; transition: background 0.3s; }
+    .tabs-container .tab-btn.active, .tabs-container-2 .tab-btn-2.active { background: #2196F3; color: #fff; }
     /* Swipix carousel styling */
     .pix-container { overflow: hidden; position: relative; margin-bottom: 15px; }
     .pix-wrapper { display: flex; transition: transform 300ms ease; will-change: transform; }
@@ -32,6 +32,13 @@
     <div class="tabs-container">
       <button class="tab-btn">Tab 1 (Slides 0-3)</button>
       <button class="tab-btn">Tab 2 (Slides 4+)</button>
+    </div>
+
+    <div class="tabs-container-2">
+      <button class="tab-btn-2 active">Tab 1</button>
+      <button class="tab-btn-2">Tab 2</button>
+      <button class="tab-btn-2">Tab 3</button>
+      <button class="tab-btn-2">Tab 4</button>
     </div>
     
     <!-- Carousel Container using new class names -->
@@ -70,13 +77,21 @@
       slidesPerView: { default: 3 },
       gap: 0,
       slidesToMove: 1,
-      tabsConfig: {
+      tabsConfig: [{
         container: '.tabs-container',
         buttonSelector: '.tab-btn',
         mapping: [0, 3],
         rangeMapping: true,
         activeClass: 'active'
+      },
+      {
+        container: '.tabs-container-2',
+        buttonSelector: '.tab-btn-2',
+        mapping: [0, 2, 4, 5],
+        rangeMapping: true,
+        activeClass: 'active'
       }
+    ]
     }).init();
   </script>
 </body>

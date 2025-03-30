@@ -30,7 +30,7 @@ Swipix is a customizable carousel library that offers a wide range of features i
 ### Direct script include
 
 ```html
-<script src="https://unpkg.com/swipix/dist/swipix.umd.js"></script>
+<script src="https://unpkg.com/swipix@latest/dist/swipix.umd.js"></script>
 ```
 
 ## Basic Usage

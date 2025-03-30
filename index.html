@@ -10,35 +10,28 @@
       margin: 0;
       padding: 0;
     }
-    
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
     }
-    
     .container {
       max-width: 1000px;
       margin: 0 auto;
     }
-    
     h1 {
       text-align: center;
       margin-bottom: 30px;
     }
-    
     .carousel-section {
       margin-bottom: 50px;
     }
-    
     h2 {
       margin-bottom: 15px;
     }
-    
     /* Carousel basic styling using new class names */
     .pix-container {
       margin-bottom: 20px;
     }
-    
     .pix-slide {
       padding: 20px;
       text-align: center;
@@ -51,7 +44,6 @@
       font-size: 24px;
       position: relative;
     }
-    
     /* Navigation buttons */
     .carousel-nav {
       display: flex;
@@ -59,7 +51,6 @@
       gap: 10px;
       margin-top: 10px;
     }
-    
     .carousel-btn {
       padding: 8px 16px;
       background-color: #4CAF50;
@@ -68,11 +59,9 @@
       border-radius: 4px;
       cursor: pointer;
     }
-    
     .carousel-btn:hover {
       background-color: #45a049;
     }
-    
     /* Configuration panel */
     .config-panel {
       margin-top: 30px;
@@ -81,16 +70,13 @@
       border: 1px solid #ddd;
       border-radius: 4px;
     }
-    
     .config-group {
       margin-bottom: 15px;
     }
-    
     .config-group label {
       display: block;
       margin-bottom: 5px;
     }
-    
     .config-group input,
     .config-group select {
       width: 100%;
@@ -98,7 +84,6 @@
       border: 1px solid #ddd;
       border-radius: 4px;
     }
-    
     .update-config-btn, .go-to-slide-btn {
       padding: 10px 20px;
       background-color: #2196F3;
@@ -109,11 +94,15 @@
       display: block;
       margin: 10px auto;
     }
-    
     .update-config-btn:hover, .go-to-slide-btn:hover {
       background-color: #0b7dda;
     }
-    
+    /* Autoplay configuration group */
+    .config-group.autoplay-group {
+      border-top: 1px solid #ddd;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
     /* Slide numbers for demo */
     .slide-number {
       position: absolute;
@@ -125,13 +114,11 @@
       border-radius: 4px;
       font-size: 14px;
     }
-    
     /* Active slide indicator */
     .pix-slide.active {
       border: 2px solid #4CAF50;
       background-color: #e8f5e9;
     }
-    
     /* Clone indicators */
     .pix-slide[data-slide-type="clone-start"]::before,
     .pix-slide[data-slide-type="clone-end"]::before {
@@ -145,7 +132,6 @@
       border-radius: 4px;
       font-size: 12px;
     }
-    
     .pix-slide[data-slide-type="real"]::before {
       content: "Real";
       position: absolute;
@@ -157,7 +143,6 @@
       border-radius: 4px;
       font-size: 12px;
     }
-    
     /* Status indicator */
     .status-indicator {
       margin-top: 10px;
@@ -167,7 +152,6 @@
       font-size: 14px;
       text-align: center;
     }
-    
     /* SlideTo Test Panel */
     .slide-to-panel {
       margin-top: 20px;
@@ -177,7 +161,6 @@
       border-radius: 4px;
       text-align: center;
     }
-    
     .slide-to-panel input {
       width: 60px;
       padding: 5px;
@@ -190,7 +173,6 @@
 <body>
   <div class="container">
     <h1>Swipix Infinite Loop Demo</h1>
-    
     <section class="carousel-section">
       <h2>Infinite Loop Carousel</h2>
       <div class="pix-container" id="infinite-carousel">
@@ -211,7 +193,6 @@
           Real Slides Offset: <span id="infinite-offset">0</span> |
           Total Slides (with clones): <span id="infinite-total">0</span>
         </div>
-        
         <!-- SlideTo Test Panel -->
         <div class="slide-to-panel">
           <label for="slide-to-input">Go To Slide (zero-based index):</label>
@@ -230,7 +211,7 @@
           </select>
         </div>
         <div class="config-group">
-          <label for="loop-mode">Standard Loop Mode (used when infinite loop is disabled):</label>
+          <label for="loop-mode">Standard Loop Mode (when infinite loop is disabled):</label>
           <select id="loop-mode">
             <option value="true">Enabled</option>
             <option value="false" selected>Disabled</option>
@@ -260,6 +241,32 @@
           <label for="slides-to-move">Slides to Move per Click:</label>
           <input type="number" id="slides-to-move" value="1" min="1" max="5">
         </div>
+        <!-- New Autoplay Configuration -->
+        <div class="config-group autoplay-group">
+          <label for="autoplay-enabled">Autoplay:</label>
+          <select id="autoplay-enabled">
+            <option value="true" selected>Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="config-group autoplay-group">
+          <label for="autoplay-delay">Autoplay Delay (ms):</label>
+          <input type="number" id="autoplay-delay" value="3000" min="1000" max="10000">
+        </div>
+        <div class="config-group autoplay-group">
+          <label for="pause-on-interaction">Pause on Interaction:</label>
+          <select id="pause-on-interaction">
+            <option value="true" selected>Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div class="config-group autoplay-group">
+          <label for="pause-after-interaction">Pause After Interaction (permanent):</label>
+          <select id="pause-after-interaction">
+            <option value="false" selected>No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
         <button class="update-config-btn" id="update-config">Update Configuration</button>
       </div>
     </section>
@@ -285,9 +292,8 @@
 
   <!-- Import the Swipix library -->
   <script src="script.js"></script>
-  
   <script>
-    // Initialize the infinite loop carousel using Swipix
+    // Initialize the infinite loop carousel using Swipix with autoplay enabled.
     const infiniteCarousel = new Swipix({
       container: '#infinite-carousel',
       nextButton: '.next-btn',
@@ -295,16 +301,13 @@
       loop: false,
       infiniteLoop: true,
       speed: 300,
-      slidesPerView: {
-        default: 1,
-        768: 2,
-        1024: 3
-      },
+      slidesPerView: { default: 1, 768: 2, 1024: 3 },
       gap: 10,
-      slidesToMove: 1
+      slidesToMove: 1,
+      autoplay: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
     }).init();
     
-    // Initialize the standard carousel for comparison
+    // Initialize the standard carousel for comparison.
     const standardCarousel = new Swipix({
       container: '#standard-carousel',
       nextButton: '.std-next-btn',
@@ -312,32 +315,23 @@
       loop: false,
       infiniteLoop: false,
       speed: 300,
-      slidesPerView: {
-        default: 1,
-        768: 2,
-        1024: 3
-      },
+      slidesPerView: { default: 1, 768: 2, 1024: 3 },
       gap: 10,
       slidesToMove: 1
     }).init();
     
-    // Update status display with current carousel information for infinite carousel
+    // Update status display for infinite carousel.
     function updateStatus() {
       const carouselData = infiniteCarousel.state.carousels[0];
-      
       if (carouselData) {
         document.getElementById('infinite-index').textContent = carouselData.currentIndex;
         document.getElementById('infinite-offset').textContent = carouselData.realSlidesOffset || 0;
         document.getElementById('infinite-total').textContent = carouselData.slides.length;
-        
-        // Highlight the active slide(s)
         const slides = document.querySelectorAll('#infinite-carousel .pix-slide');
         slides.forEach(slide => slide.classList.remove('active'));
         if (slides[carouselData.currentIndex]) {
           slides[carouselData.currentIndex].classList.add('active');
         }
-        
-        // For debugging - add data attribute for real vs. clone slides
         slides.forEach((slide, index) => {
           if (index < carouselData.realSlidesOffset) {
             slide.setAttribute('data-slide-type', 'clone-start');
@@ -350,7 +344,7 @@
       }
     }
     
-    // Add slide numbers for better visualization
+    // Add slide numbers for better visualization.
     function addSlideNumbers() {
       document.querySelectorAll('.pix-container').forEach(container => {
         const slides = container.querySelectorAll('.pix-slide');
@@ -364,23 +358,15 @@
       });
     }
     
-    // Call initial setup functions
     addSlideNumbers();
     updateStatus();
     
-    // Update status after navigation buttons click
     document.querySelectorAll('.carousel-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setTimeout(updateStatus, 350);
-      });
+      btn.addEventListener('click', () => { setTimeout(updateStatus, 350); });
     });
     
-    // Listen for custom slide change events (using Swipix event name)
-    document.addEventListener('swipix:slideChanged', () => {
-      setTimeout(updateStatus, 350);
-    });
+    document.addEventListener('swipix:slideChanged', () => { setTimeout(updateStatus, 350); });
     
-    // Handle configuration updates
     document.getElementById('update-config').addEventListener('click', function() {
       const infiniteMode = document.getElementById('infinite-mode').value === 'true';
       const loopMode = document.getElementById('loop-mode').value === 'true';
@@ -390,25 +376,25 @@
       const slidesDesktop = parseInt(document.getElementById('slides-desktop').value);
       const slideGap = parseInt(document.getElementById('slide-gap').value);
       const slidesToMove = parseInt(document.getElementById('slides-to-move').value);
+      const autoplayEnabled = document.getElementById('autoplay-enabled').value === 'true';
+      const autoplayDelay = parseInt(document.getElementById('autoplay-delay').value);
+      const pauseOnInteraction = document.getElementById('pause-on-interaction').value === 'true';
+      const pauseAfterInteraction = document.getElementById('pause-after-interaction').value === 'true';
       
       infiniteCarousel.updateConfig({
         infiniteLoop: infiniteMode,
         loop: loopMode,
         speed: speed,
-        slidesPerView: {
-          default: slidesDefault,
-          768: slidesTablet,
-          1024: slidesDesktop
-        },
+        slidesPerView: { default: slidesDefault, 768: slidesTablet, 1024: slidesDesktop },
         gap: slideGap,
-        slidesToMove: slidesToMove
+        slidesToMove: slidesToMove,
+        autoplay: { enabled: autoplayEnabled, delay: autoplayDelay, pauseOnInteraction: pauseOnInteraction, pauseAfterInteraction: pauseAfterInteraction }
       });
       
       setTimeout(updateStatus, 100);
       alert('Configuration updated successfully!');
     });
     
-    // Handle the slideTo test button
     document.getElementById('go-to-slide-btn').addEventListener('click', () => {
       const inputVal = document.getElementById('slide-to-input').value;
       const targetIndex = parseInt(inputVal, 10);

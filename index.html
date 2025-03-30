@@ -319,6 +319,24 @@
         </div>
       </div>
     </section>
+
+    <section class="carousel-section">
+      <h2>Standard Carousel (lazyPix)</h2>
+      <div class="pix-container" id="lazypix-carousel">
+        <div class="pix-wrapper">
+          <div class="pix-slide">Slide 1</div>
+          <div class="pix-slide">Slide 2</div>
+          <div class="pix-slide">Slide 3</div>
+          <div class="pix-slide">Slide 4</div>
+          <div class="pix-slide">Slide 5</div>
+          <div class="pix-slide">Slide 6</div>
+        </div>
+        <div class="carousel-nav">
+          <button class="carousel-btn std-prev-btn">Previous</button>
+          <button class="carousel-btn std-next-btn">Next</button>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Import the Swipix library -->
@@ -363,6 +381,22 @@
       slidesToMove: 1,
       lazyMedia: true,
       lazyMediaOffset: 300 
+    }).init();
+
+    const lazypixCarousel = new Swipix({
+      container: '#lazypix-carousel',
+      nextButton: '.std-next-btn',
+      prevButton: '.std-prev-btn',
+      loop: false,
+      infiniteLoop: false,
+      speed: 300,
+      slidesPerView: { default: 1, 768: 2, 1024: 3 },
+      gap: 10,
+      slidesToMove: 1,
+      lazyMedia: true,
+      lazyMediaOffset: 300 ,
+      lazyPix: true,
+      lazyPixOffset: 0,
     }).init();
     
     // Update status display for infinite carousel.

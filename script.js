@@ -1,7 +1,7 @@
 /**
  * Swipix - A customizable carousel library
  * Supports infinite looping, built-in tabs (with optional range mapping and multiple tab groups),
- * autoplay with pause on interaction, and media lazy loading with an offset.
+ * autoplay with pause on interaction, media lazy loading, and lazy initialization (lazyPix).
  */
 class Swipix {
   /**
@@ -18,8 +18,10 @@ class Swipix {
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
    * @param {Object|Array} [config.tabsConfig] - Optional configuration for tab buttons.
    * @param {Object} [config.autoplay] - Autoplay configuration: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
-   * @param {boolean} [config.lazyMedia] - When true, media inside slides (img/video with data-src) will be lazy loaded only when near/within the viewport.
-   * @param {number} [config.lazyMediaOffset] - The offset (in pixels) used with IntersectionObserver to trigger lazy loading (default: 100).
+   * @param {boolean} [config.lazyMedia] - When true, media inside slides (img/video with data-src) will be lazy loaded when visible.
+   * @param {number} [config.lazyMediaOffset] - Offset in pixels for triggering lazy media load (default: 100).
+   * @param {boolean} [config.lazyPix] - When true, the carousel will not initialize until its container is near the viewport.
+   * @param {number} [config.lazyPixOffset] - Offset in pixels used with IntersectionObserver to trigger lazy initialization (default: 150).
    */
   constructor(config) {
     this.config = {
@@ -35,6 +37,8 @@ class Swipix {
       autoplay: { enabled: false, delay: 3000, pauseOnInteraction: false, pauseAfterInteraction: false },
       lazyMedia: false,
       lazyMediaOffset: 100,
+      lazyPix: false,
+      lazyPixOffset: 150,
       ...config
     };
 
@@ -53,7 +57,12 @@ class Swipix {
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
     containers.forEach(container => {
-      this._initSingleCarousel(container);
+      // If lazyPix is enabled, delay initialization using an observer.
+      if (this.config.lazyPix) {
+        this._observeInit(container);
+      } else {
+        this._initSingleCarousel(container);
+      }
     });
     window.addEventListener('resize', this._handleResize.bind(this));
     if (this.config.autoplay.enabled) {
@@ -62,6 +71,24 @@ class Swipix {
       });
     }
     return this;
+  }
+
+  /**
+   * Observe the container for lazy initialization using lazyPixOffset.
+   * When container is within offset of viewport, initialize it.
+   * @param {HTMLElement} container 
+   * @private
+   */
+  _observeInit(container) {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          this._initSingleCarousel(container);
+          observer.unobserve(container);
+        }
+      });
+    }, { threshold: 0, rootMargin: `${this.config.lazyPixOffset}px` });
+    observer.observe(container);
   }
 
   _initSingleCarousel(container) {

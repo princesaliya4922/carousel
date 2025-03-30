@@ -1,6 +1,7 @@
 /**
  * Swipix - A customizable carousel library
- * Enhanced with infiniteLoop, built-in tabs support, and range-mapped tabs.
+ * Supports infinite looping, built-in tabs (with optional range mapping),
+ * and autoplay with pause on interaction.
  */
 class Swipix {
   /**
@@ -20,10 +21,11 @@ class Swipix {
    *    {
    *      container: '.tabs-container',
    *      buttonSelector: '.tab-btn', // optional
-   *      mapping: [0, 4],            // optional (with rangeMapping, mapping array sets thresholds)
+   *      mapping: [0, 4],            // optional (with rangeMapping, mapping values set thresholds)
    *      rangeMapping: true,         // optional: if true, mapping values are treated as thresholds
    *      activeClass: 'active'       // optional
    *    }
+   * @param {Object} [config.autoplay] - Autoplay configuration: { enabled: true, delay: 3000, pauseOnInteraction: true }
    */
   constructor(config) {
     // Default configuration
@@ -37,9 +39,10 @@ class Swipix {
       slidesPerView: { default: 1 },
       gap: 0,
       slidesToMove: 1,
+      autoplay: { enabled: false, delay: 3000, pauseOnInteraction: false },
       ...config
     };
-    
+
     // Internal state
     this.state = {
       currentIndex: 0,
@@ -60,13 +63,20 @@ class Swipix {
   init(containerSelector = null) {
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
-    
+
     containers.forEach(container => {
       this._initSingleCarousel(container);
     });
-    
+
     window.addEventListener('resize', this._handleResize.bind(this));
-    
+
+    // Start autoplay for each carousel if enabled
+    if (this.config.autoplay.enabled) {
+      this.state.carousels.forEach(carouselData => {
+        this._setupAutoplay(carouselData);
+      });
+    }
+
     return this;
   }
 
@@ -78,18 +88,18 @@ class Swipix {
   _initSingleCarousel(container) {
     const wrapper = container.querySelector('.pix-wrapper');
     const slides = container.querySelectorAll('.pix-slide');
-    
+
     if (!wrapper || slides.length === 0) {
       console.error('Carousel structure is invalid. Make sure you have .pix-wrapper and .pix-slide elements.');
       return;
     }
-    
+
     // Convert NodeList to Array and assign an index attribute to each real slide
     const originalSlides = Array.from(slides).map((slide, index) => {
       slide.setAttribute('data-swipix-index', index);
       return slide;
     });
-    
+
     const carouselData = {
       container,
       wrapper,
@@ -98,32 +108,70 @@ class Swipix {
       currentIndex: 0,
       isInfinite: this.config.infiniteLoop,
       clonedSlides: [], // Track cloned slides
-      realSlidesOffset: 0 // Offset for the real slides when using infiniteLoop
+      realSlidesOffset: 0, // Offset for the real slides when using infiniteLoop
+      autoplayInterval: null
     };
-    
+
     this.state.carousels.push(carouselData);
-    
+
     // Apply initial styles and functionality
     this._applyStyles(carouselData);
-    
+
     // Setup infinite loop if enabled
     if (this.config.infiniteLoop) {
       this._setupInfiniteLoop(carouselData);
     }
-    
+
     // Calculate dimensions and position slides
     this._calculateDimensions(carouselData);
-    
+
     // Initialize navigation buttons
     this._initNavigation(carouselData);
-    
+
     // Initialize touch/drag events
     this._initTouchEvents(carouselData);
-    
+
     // Initialize tabs if configured
     if (this.config.tabsConfig && this.config.tabsConfig.container) {
       this._initTabs(carouselData);
     }
+
+    // Setup autoplay pause/resume events if pauseOnInteraction is enabled
+    if (this.config.autoplay.enabled && this.config.autoplay.pauseOnInteraction) {
+      container.addEventListener('mouseenter', () => this._pauseAutoplay(carouselData));
+      container.addEventListener('mouseleave', () => this._startAutoplay(carouselData));
+    }
+  }
+
+  /**
+   * Setup autoplay for a carousel
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _setupAutoplay(carouselData) {
+    this._startAutoplay(carouselData);
+  }
+
+  /**
+   * Start autoplay for a carousel
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _startAutoplay(carouselData) {
+    if (carouselData.autoplayInterval) return;
+    carouselData.autoplayInterval = setInterval(() => {
+      this.next(carouselData.container);
+    }, this.config.autoplay.delay);
+  }
+
+  /**
+   * Pause autoplay for a carousel
+   * @param {Object} carouselData - Data for a specific carousel
+   * @private
+   */
+  _pauseAutoplay(carouselData) {
+    clearInterval(carouselData.autoplayInterval);
+    carouselData.autoplayInterval = null;
   }
 
   /**
@@ -138,7 +186,7 @@ class Swipix {
       console.warn(`Tabs container not found for selector ${tabsConf.container}`);
       return;
     }
-    
+
     let buttons;
     if (tabsConf.buttonSelector) {
       buttons = tabsContainer.querySelectorAll(tabsConf.buttonSelector);
@@ -146,19 +194,19 @@ class Swipix {
       buttons = tabsContainer.children;
     }
     buttons = Array.from(buttons);
-    
+
     // Save tabs info in carouselData for later use
     carouselData.tabsConfig = tabsConf;
     carouselData.tabsContainer = tabsContainer;
     carouselData.tabButtons = buttons;
-    
+
     // Attach click events for each tab button
     buttons.forEach((btn, index) => {
       btn.addEventListener('click', () => {
         // Determine target slide from mapping if provided, else use button index
-        let targetSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping) 
-                          ? tabsConf.mapping[index]
-                          : index;
+        let targetSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
+          ? tabsConf.mapping[index]
+          : index;
         if (targetSlide < 0 || targetSlide >= carouselData.totalSlides) {
           console.warn(`Mapping for tab index ${index} is out-of-bound.`);
           return;
@@ -166,7 +214,7 @@ class Swipix {
         this.slideTo(carouselData.container, targetSlide);
       });
     });
-    
+
     // Set initial active tab
     this._updateTabsActive(carouselData);
   }
@@ -178,16 +226,16 @@ class Swipix {
    */
   _updateTabsActive(carouselData) {
     if (!carouselData.tabsConfig || !carouselData.tabButtons) return;
-    
+
     let activeIndex = carouselData.currentIndex;
     if (carouselData.isInfinite) {
       activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
     }
     activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
-    
+
     const tabsConf = carouselData.tabsConfig;
     const activeClass = tabsConf.activeClass || 'active';
-    
+
     // If rangeMapping is enabled, use mapping thresholds to determine active tab.
     if (tabsConf.rangeMapping && Array.isArray(tabsConf.mapping) && tabsConf.mapping.length > 0) {
       let selectedTab = 0;
@@ -207,8 +255,8 @@ class Swipix {
       // Default (non-range): either use mapping equality or identity mapping.
       carouselData.tabButtons.forEach((btn, i) => {
         let mappedSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
-                          ? tabsConf.mapping[i]
-                          : i;
+          ? tabsConf.mapping[i]
+          : i;
         if (mappedSlide === activeIndex) {
           btn.classList.add(activeClass);
         } else {
@@ -225,14 +273,15 @@ class Swipix {
    */
   _setupInfiniteLoop(carouselData) {
     const { wrapper, originalSlides } = carouselData;
-    
+
     // Clear any existing clones to avoid duplicates
     this._clearClonedSlides(carouselData);
-    
+
+    // Determine the maximum slides per view from breakpoints
     const breakpointValues = Object.values(this.config.slidesPerView);
     const maxSlidesPerView = Math.max(...breakpointValues);
-    const cloneCount = maxSlidesPerView + this.config.slidesToMove;
-    
+    const cloneCount = maxSlidesPerView;
+
     // Clone beginning slides and append to the end
     const beginClones = [];
     for (let i = 0; i < cloneCount; i++) {
@@ -243,7 +292,7 @@ class Swipix {
       wrapper.appendChild(clone);
       beginClones.push(clone);
     }
-    
+
     // Clone ending slides and prepend to the beginning
     const endClones = [];
     for (let i = 0; i < cloneCount; i++) {
@@ -254,7 +303,7 @@ class Swipix {
       wrapper.insertBefore(clone, wrapper.firstChild);
       endClones.push(clone);
     }
-    
+
     carouselData.clonedSlides = [...endClones, ...beginClones];
     carouselData.realSlidesOffset = endClones.length;
     carouselData.slides = Array.from(wrapper.querySelectorAll('.pix-slide'));
@@ -291,7 +340,7 @@ class Swipix {
     wrapper.style.display = 'flex';
     wrapper.style.transition = `transform ${this.config.speed}ms ease`;
     wrapper.style.willChange = 'transform';
-    
+
     slides.forEach(slide => {
       slide.style.flexShrink = '0';
       if (this.config.gap > 0) {
@@ -308,30 +357,30 @@ class Swipix {
   _calculateDimensions(carouselData) {
     const { container, wrapper, slides } = carouselData;
     const viewportWidth = window.innerWidth;
-    
+
     let slidesPerView = this.config.slidesPerView.default;
     const breakpoints = Object.keys(this.config.slidesPerView)
       .filter(bp => bp !== 'default')
       .map(bp => parseInt(bp, 10))
       .sort((a, b) => b - a);
-    
+
     for (const bp of breakpoints) {
       if (viewportWidth >= bp) {
         slidesPerView = this.config.slidesPerView[bp];
         break;
       }
     }
-    
+
     carouselData.slidesPerView = slidesPerView;
     carouselData.containerWidth = container.offsetWidth;
     const totalGapSpace = this.config.gap * (slidesPerView - 1);
     carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
     carouselData.totalSlides = carouselData.originalSlides.length;
-    
+
     slides.forEach(slide => {
       slide.style.width = `${carouselData.slideWidth}px`;
     });
-    
+
     carouselData.gap = this.config.gap;
     if (carouselData.isInfinite) {
       this._setupInfiniteLoop(carouselData);
@@ -408,7 +457,7 @@ class Swipix {
     const { container, wrapper } = carouselData;
     let startX, moveX, isDragging = false;
     let initialTransform = 0;
-    
+
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
@@ -421,7 +470,7 @@ class Swipix {
       wrapper.style.transition = 'none';
       wrapper.style.cursor = 'grabbing';
     };
-    
+
     const handleDragMove = (e) => {
       if (!isDragging) return;
       moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
@@ -434,7 +483,7 @@ class Swipix {
       }
       wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
     };
-    
+
     const handleDragEnd = (e) => {
       if (!isDragging) return;
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
@@ -461,7 +510,7 @@ class Swipix {
       });
       document.dispatchEvent(event);
     };
-    
+
     container.addEventListener('touchstart', handleDragStart, { passive: false });
     container.addEventListener('touchmove', handleDragMove, { passive: true });
     container.addEventListener('touchend', handleDragEnd);
@@ -668,7 +717,7 @@ class Swipix {
     const oldConfig = { ...this.config };
     this.config = { ...this.config, ...newConfig };
     const infiniteLoopChanged = oldConfig.infiniteLoop !== this.config.infiniteLoop;
-    
+
     this.state.carousels.forEach(carouselData => {
       if (infiniteLoopChanged) {
         carouselData.isInfinite = this.config.infiniteLoop;
@@ -684,15 +733,20 @@ class Swipix {
           carouselData.realSlidesOffset = 0;
         }
       }
-      
+
       this._applyStyles(carouselData);
       this._calculateDimensions(carouselData);
-      
+
       if (this.config.tabsConfig && this.config.tabsConfig.container) {
         this._initTabs(carouselData);
       }
+
+      if (this.config.autoplay.enabled) {
+        this._pauseAutoplay(carouselData);
+        this._startAutoplay(carouselData);
+      }
     });
-    
+
     return this;
   }
 

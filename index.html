@@ -43,6 +43,7 @@
       justify-content: center;
       font-size: 24px;
       position: relative;
+      overflow: hidden;
     }
     /* Navigation buttons */
     .carousel-nav {
@@ -245,8 +246,8 @@
         <div class="config-group autoplay-group">
           <label for="autoplay-enabled">Autoplay:</label>
           <select id="autoplay-enabled">
-            <option value="true" selected>Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="true">Enabled</option>
+            <option value="false" selected>Disabled</option>
           </select>
         </div>
         <div class="config-group autoplay-group">
@@ -288,6 +289,36 @@
         </div>
       </div>
     </section>
+
+    <section class="carousel-section">
+      <h2>Lazy Carousel</h2>
+      <div class="pix-container" id="lazy-carousel">
+        <div class="pix-wrapper">
+          <div class="pix-slide">
+            <img data-src="https://picsum.photos/id/237/200/300" >
+          </div>
+          <div class="pix-slide">
+            <img data-src="https://picsum.photos/seed/picsum/200/300" >
+          </div>
+          <div class="pix-slide">
+            <img data-src="https://fastly.picsum.photos/id/1/5000/3333.jpg?hmac=Asv2DU3rA_5D1xSe22xZK47WEAN0wjWeFOhzd13ujW4" >
+          </div>
+          <div class="pix-slide">
+            <img data-src="https://fastly.picsum.photos/id/13/2500/1667.jpg?hmac=SoX9UoHhN8HyklRA4A3vcCWJMVtiBXUg0W4ljWTor7s" >
+          </div>
+          <div class="pix-slide">
+            <img data-src="https://picsum.photos/200/300?grayscale" >
+          </div>
+          <div class="pix-slide">
+            <img data-src="https://fastly.picsum.photos/id/13/2500/1667.jpg?hmac=SoX9UoHhN8HyklRA4A3vcCWJMVtiBXUg0W4ljWTor7s" >
+          </div>
+        </div>
+        <div class="carousel-nav">
+          <button class="carousel-btn std-prev-btn">Previous</button>
+          <button class="carousel-btn std-next-btn">Next</button>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Import the Swipix library -->
@@ -304,7 +335,7 @@
       slidesPerView: { default: 1, 768: 2, 1024: 3 },
       gap: 10,
       slidesToMove: 1,
-      autoplay: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
+      autoplay: { enabled: false, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
     }).init();
     
     // Initialize the standard carousel for comparison.
@@ -318,6 +349,20 @@
       slidesPerView: { default: 1, 768: 2, 1024: 3 },
       gap: 10,
       slidesToMove: 1
+    }).init();
+
+    const lazyCarousel = new Swipix({
+      container: '#lazy-carousel',
+      nextButton: '.std-next-btn',
+      prevButton: '.std-prev-btn',
+      loop: false,
+      infiniteLoop: false,
+      speed: 300,
+      slidesPerView: { default: 1, 768: 2, 1024: 3 },
+      gap: 10,
+      slidesToMove: 1,
+      lazyMedia: true,
+      lazyMediaOffset: 300 
     }).init();
     
     // Update status display for infinite carousel.

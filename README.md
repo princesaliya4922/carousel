@@ -1,40 +1,41 @@
-# Swipix Carousel Library Documentation
+# Swipix
+
+A lightweight, feature-rich carousel/slider library for modern web applications.
 
 ## Overview
 
-Swipix is a customizable, feature-rich JavaScript carousel library that enables developers to create responsive, touch-enabled slider components with various configuration options. The library supports standard carousel functionality along with advanced features such as infinite looping, tabs integration, and responsive breakpoints.
+Swipix is a customizable carousel library that offers a wide range of features including infinite looping, responsive layouts, touch gestures, built-in tab support, autoplay, lazy loading, and more. It's designed to be flexible and easy to implement in any web project.
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
 - [Configuration Options](#configuration-options)
-- [Core Features](#core-features)
-  - [Infinite Loop](#infinite-loop)
-  - [Standard Loop](#standard-loop)
+- [Features](#features)
   - [Responsive Design](#responsive-design)
-  - [Touch and Drag Support](#touch-and-drag-support)
-  - [Tab Integration](#tab-integration)
-- [API Reference](#api-reference)
-  - [Methods](#methods)
-  - [Events](#events)
+  - [Infinite Loop](#infinite-loop)
+  - [Touch & Mouse Interaction](#touch--mouse-interaction)
+  - [Built-in Tabs](#built-in-tabs)
+  - [Autoplay](#autoplay)
+  - [Lazy Loading](#lazy-loading)
+  - [Lazy Initialization](#lazy-initialization)
+- [API Methods](#api-methods)
+- [Events](#events)
 - [Examples](#examples)
-  - [Basic Carousel](#basic-carousel)
-  - [Infinite Loop Carousel](#infinite-loop-carousel)
-  - [Tabs Integration](#tabs-integration)
-- [Troubleshooting](#troubleshooting)
+- [Browser Support](#browser-support)
+- [License](#license)
 
 ## Installation
 
-Include the Swipix library in your project:
+### Direct script include
 
 ```html
-<script src="path/to/script.js"></script>
+<script src="https://unpkg.com/swipix/dist/swipix.umd.js"></script>
 ```
 
 ## Basic Usage
 
-### HTML Structure
+1. Create the HTML structure for your carousel:
 
 ```html
 <div class="pix-container">
@@ -42,32 +43,22 @@ Include the Swipix library in your project:
     <div class="pix-slide">Slide 1</div>
     <div class="pix-slide">Slide 2</div>
     <div class="pix-slide">Slide 3</div>
-    <!-- Add more slides as needed -->
+    <!-- More slides -->
   </div>
-  
-  <!-- Optional navigation buttons -->
-  <button class="prev-btn">Previous</button>
-  <button class="next-btn">Next</button>
 </div>
+
+<!-- Optional Navigation Buttons -->
+<button class="prev-btn">Previous</button>
+<button class="next-btn">Next</button>
 ```
 
-### JavaScript Initialization
+2. Initialize the carousel with JavaScript:
 
 ```javascript
 const carousel = new Swipix({
   container: '.pix-container',
   nextButton: '.next-btn',
-  prevButton: '.prev-btn',
-  loop: false,
-  infiniteLoop: true,
-  speed: 300,
-  slidesPerView: {
-    default: 1,
-    768: 2,
-    1024: 3
-  },
-  gap: 10,
-  slidesToMove: 1
+  prevButton: '.prev-btn'
 }).init();
 ```
 
@@ -75,315 +66,313 @@ const carousel = new Swipix({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `container` | String | `.pix-container` | CSS selector for the carousel container |
-| `nextButton` | String/null | `null` | CSS selector for the next button |
-| `prevButton` | String/null | `null` | CSS selector for the previous button |
-| `loop` | Boolean | `false` | Enable standard looping (has no effect when infiniteLoop is true) |
+| `container` | String | `.pix-container` | Selector for the carousel container |
+| `nextButton` | String/null | `null` | Selector for the next button |
+| `prevButton` | String/null | `null` | Selector for the previous button |
+| `loop` | Boolean | `false` | Enable standard looping (return to first/last slide) |
 | `infiniteLoop` | Boolean | `false` | Enable true infinite sliding with cloned slides |
 | `speed` | Number | `300` | Transition speed in milliseconds |
-| `slidesPerView` | Object | `{ default: 1 }` | Number of slides to show based on viewport width breakpoints |
+| `slidesPerView` | Object | `{ default: 1 }` | Number of slides to show based on viewport width |
 | `gap` | Number | `0` | Gap between slides in pixels |
 | `slidesToMove` | Number | `1` | Number of slides to move per navigation action |
-| `tabsConfig` | Object | `undefined` | Configuration for tab buttons integration (optional) |
+| `tabsConfig` | Object/Array | `undefined` | Configuration for built-in tabs |
+| `autoplay` | Object | `{ enabled: false, delay: 3000, pauseOnInteraction: false, pauseAfterInteraction: false }` | Autoplay configuration |
+| `lazyMedia` | Boolean | `false` | When true, media inside slides (img/video with data-src) will be lazy loaded when visible |
+| `lazyMediaOffset` | Number | `100` | Offset in pixels for triggering lazy media load |
+| `lazyPix` | Boolean | `false` | When true, initializes the carousel only when it's near the viewport |
+| `lazyPixOffset` | Number | `150` | Offset in pixels for lazy initialization |
 
-### TabsConfig Options
+### Responsive Configuration
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `container` | String | Required | CSS selector for the tabs container |
-| `buttonSelector` | String | `container children` | CSS selector for tab buttons within the container |
-| `mapping` | Array | `null` | Maps tab indices to slide indices |
-| `rangeMapping` | Boolean | `false` | If true, mapping values are treated as thresholds |
-| `activeClass` | String | `'active'` | CSS class to apply to active tab |
-
-## Core Features
-
-### Infinite Loop
-
-The infinite loop feature creates a seamless, continuous sliding experience by cloning slides and intelligently repositioning them when edges are reached. This ensures that users can continuously navigate through slides without experiencing jumps or pauses.
+The `slidesPerView` option accepts an object with breakpoints:
 
 ```javascript
-const infiniteCarousel = new Swipix({
-  container: '#carousel',
-  infiniteLoop: true,
-  // other config options...
-}).init();
+slidesPerView: {
+  default: 1, // Default value for mobile
+  768: 2,     // 2 slides when viewport width >= 768px
+  1024: 3     // 3 slides when viewport width >= 1024px
+}
 ```
 
-#### Implementation Details
-
-When `infiniteLoop` is enabled:
-
-1. The library clones slides at both ends of the carousel
-2. The cloned slides count is determined by `Math.max(...slidesPerView) + slidesToMove`
-3. When reaching a cloned section, the carousel instantly (without animation) repositions to the corresponding real slides
-4. The transition is seamless and unnoticeable to users
-
-### Standard Loop
-
-When `infiniteLoop` is disabled but `loop` is enabled, the carousel will jump from the last slide to the first (or vice versa) when navigating past the edges.
-
-```javascript
-const loopCarousel = new Swipix({
-  container: '#carousel',
-  loop: true,
-  infiniteLoop: false,
-  // other config options...
-}).init();
-```
+## Features
 
 ### Responsive Design
 
-Swipix supports responsive design through breakpoint-based configuration for `slidesPerView`:
+Swipix automatically adapts to different screen sizes with the configurable `slidesPerView` option. This allows you to display different numbers of slides based on the viewport width.
 
 ```javascript
-const responsiveCarousel = new Swipix({
-  container: '#carousel',
+const carousel = new Swipix({
+  container: '.pix-container',
   slidesPerView: {
-    default: 1, // 1 slide on mobile
-    768: 2,     // 2 slides on tablets (>= 768px)
-    1024: 3     // 3 slides on desktops (>= 1024px)
-  },
-  // other config options...
+    default: 1, // Mobile view
+    768: 2,     // Tablet view
+    1024: 3     // Desktop view
+  }
 }).init();
 ```
 
-The library automatically adjusts the slide width and layout on window resize events.
+### Infinite Loop
 
-### Touch and Drag Support
+Swipix offers two loop options:
 
-Swipix provides touch and mouse drag support for intuitive user interaction:
+1. **Standard Loop** (`loop: true`): When you reach the end, clicking "next" will take you back to the first slide.
 
-- Touch swipe on mobile devices
-- Mouse drag on desktop browsers
-- Momentum-based navigation based on swipe/drag speed and distance
-- Resistance effect when dragging beyond the first or last slide (non-infinite mode)
-
-### Tab Integration
-
-Swipix offers built-in tab integration, allowing tabs to control the carousel and stay synchronized with the current slide:
+2. **Infinite Loop** (`infiniteLoop: true`): Creates a true infinite loop by cloning slides, providing a seamless and continuous experience.
 
 ```javascript
-const tabCarousel = new Swipix({
-  container: '#carousel',
+// True infinite carousel with cloned slides
+const infiniteCarousel = new Swipix({
+  container: '.pix-container',
+  infiniteLoop: true
+}).init();
+```
+
+### Touch & Mouse Interaction
+
+Swipix includes built-in support for touch swipe and mouse drag interactions. Users can navigate slides with touch or mouse gestures without any additional configuration.
+
+### Built-in Tabs
+
+Swipix supports integrated tabs for navigating between slides. This is particularly useful for creating tab-controlled content carousels.
+
+```javascript
+const carouselWithTabs = new Swipix({
+  container: '.pix-container',
   tabsConfig: {
     container: '.tabs-container',
     buttonSelector: '.tab-btn',
-    mapping: [0, 4], // Tab 1 -> Slide 0, Tab 2 -> Slide 4
-    rangeMapping: true,
     activeClass: 'active'
-  },
-  // other config options...
+  }
 }).init();
 ```
 
-#### Range Mapping Mode
+#### Advanced Tab Configuration
 
-When `rangeMapping` is enabled, the mapping array values are treated as thresholds:
-- If current slide index < mapping[1], then tab at index 0 is active
-- If current slide index >= mapping[1], then tab at index 1 is active
-
-This is useful for representing sections of slides with a single tab.
-
-## API Reference
-
-### Methods
-
-| Method | Parameters | Description |
-|--------|------------|-------------|
-| `init([containerSelector])` | Optional container selector | Initialize the carousel |
-| `next(container)` | Container element or selector | Move to next slide |
-| `prev(container)` | Container element or selector | Move to previous slide |
-| `goTo(container, index)` | Container element/selector, target index | Go to a specific slide by index |
-| `slideTo(container, index)` | Container/index, optional index | Alternate way to navigate to a specific slide |
-| `updateConfig(newConfig)` | New configuration object | Update carousel configuration |
-| `destroy()` | None | Destroy carousel instance and clean up events |
-
-#### Method Example Usage
+You can map specific tabs to specific slides:
 
 ```javascript
-// Initialize carousel
+tabsConfig: {
+  container: '.tabs-container',
+  buttonSelector: '.tab-btn',
+  mapping: [0, 3, 5], // First tab -> slide 0, second tab -> slide 3, etc.
+  activeClass: 'active'
+}
+```
+
+You can also use range mapping to activate tabs based on slide ranges:
+
+```javascript
+tabsConfig: {
+  container: '.tabs-container',
+  buttonSelector: '.tab-btn',
+  mapping: [0, 3], // If slide index < 3, activate first tab, otherwise second tab
+  rangeMapping: true,
+  activeClass: 'active'
+}
+```
+
+Multiple tab groups can be configured by providing an array of tab configurations:
+
+```javascript
+tabsConfig: [
+  {
+    container: '.tabs-container-1',
+    buttonSelector: '.tab-btn-1'
+  },
+  {
+    container: '.tabs-container-2',
+    buttonSelector: '.tab-btn-2',
+    mapping: [0, 3, 5]
+  }
+]
+```
+
+### Autoplay
+
+Swipix includes configurable autoplay functionality:
+
+```javascript
+const autoplayCarousel = new Swipix({
+  container: '.pix-container',
+  autoplay: {
+    enabled: true,
+    delay: 3000,               // Time between slides in milliseconds
+    pauseOnInteraction: true,  // Pause when user interacts with carousel
+    pauseAfterInteraction: false // Don't resume after user interaction
+  }
+}).init();
+```
+
+### Lazy Loading
+
+Swipix supports lazy loading of media content within slides:
+
+```javascript
+const lazyCarousel = new Swipix({
+  container: '.pix-container',
+  lazyMedia: true,
+  lazyMediaOffset: 100 // Load media when slides are 100px from entering the viewport
+}).init();
+```
+
+To use lazy loading, add a `data-src` attribute to your media elements instead of `src`:
+
+```html
+<div class="pix-slide">
+  <img data-src="image.jpg" alt="Lazy loaded image">
+</div>
+```
+
+### Lazy Initialization
+
+For performance optimization, Swipix can initialize the carousel only when it's near the viewport:
+
+```javascript
+const lazyInitCarousel = new Swipix({
+  container: '.pix-container',
+  lazyPix: true,
+  lazyPixOffset: 150 // Initialize when carousel is 150px from entering the viewport
+}).init();
+```
+
+## API Methods
+
+Swipix provides several methods to control the carousel programmatically:
+
+### `init([selector])`
+
+Initializes the carousel. Optionally accepts a container selector.
+
+```javascript
 const carousel = new Swipix(config).init();
+// or
+const carousel = new Swipix(config).init('#my-carousel');
+```
 
-// Navigate to next slide
-carousel.next('#carousel');
+### `next(container)`
 
-// Navigate to previous slide
-carousel.prev('#carousel');
+Navigate to the next slide.
 
-// Go to specific slide (index starts at 0)
-carousel.goTo('#carousel', 3);
+```javascript
+carousel.next('.pix-container');
+```
 
-// Alternative syntax for going to a specific slide
-carousel.slideTo('#carousel', 3);
+### `prev(container)`
 
-// Update configuration
+Navigate to the previous slide.
+
+```javascript
+carousel.prev('.pix-container');
+```
+
+### `slideTo(container, index)`
+
+Navigate to a specific slide by index (zero-based).
+
+```javascript
+carousel.slideTo('.pix-container', 2); // Go to the third slide
+```
+
+If you have only one carousel, you can simplify:
+
+```javascript
+carousel.slideTo(2); // Go to the third slide of the first carousel
+```
+
+### `updateConfig(newConfig)`
+
+Update carousel configuration after initialization.
+
+```javascript
 carousel.updateConfig({
-  infiniteLoop: true,
-  speed: 500
+  speed: 500,
+  gap: 20,
+  autoplay: { enabled: true, delay: 5000 }
 });
+```
 
-// Destroy carousel
+### `destroy()`
+
+Completely removes the carousel functionality and reverts to the original HTML structure.
+
+```javascript
 carousel.destroy();
 ```
 
-### Events
+## Events
 
-Swipix dispatches custom events that you can listen for:
+Swipix emits events that you can listen for:
 
-| Event | Detail Object | Description |
-|-------|--------------|-------------|
-| `swipix:slideChanged` | `{ carousel, container, currentIndex }` | Fired when slide transition completes |
+### `swipix:slideChanged`
 
-#### Event Example Usage
+Fired when the active slide changes.
 
 ```javascript
 document.addEventListener('swipix:slideChanged', (event) => {
-  const { carousel, container, currentIndex } = event.detail;
-  console.log(`Carousel slide changed to index: ${currentIndex}`);
+  console.log('Slide changed:', event.detail.currentIndex);
 });
 ```
+
+The event detail contains:
+- `carousel`: The Swipix instance
+- `container`: The carousel container element
+- `currentIndex`: The current slide index
 
 ## Examples
 
 ### Basic Carousel
 
-```html
-<div class="pix-container" id="basic-carousel">
-  <div class="pix-wrapper">
-    <div class="pix-slide">Slide 1</div>
-    <div class="pix-slide">Slide 2</div>
-    <div class="pix-slide">Slide 3</div>
-  </div>
-  <button class="prev-btn">Previous</button>
-  <button class="next-btn">Next</button>
-</div>
-
-<script>
-  const basicCarousel = new Swipix({
-    container: '#basic-carousel',
-    nextButton: '.next-btn', 
-    prevButton: '.prev-btn',
-    speed: 300,
-    slidesPerView: { default: 1 }
-  }).init();
-</script>
+```javascript
+const basicCarousel = new Swipix({
+  container: '#basic-carousel',
+  nextButton: '.next-btn',
+  prevButton: '.prev-btn'
+}).init();
 ```
 
-### Infinite Loop Carousel
-
-```html
-<div class="pix-container" id="infinite-carousel">
-  <div class="pix-wrapper">
-    <div class="pix-slide">Slide 1</div>
-    <div class="pix-slide">Slide 2</div>
-    <div class="pix-slide">Slide 3</div>
-    <div class="pix-slide">Slide 4</div>
-  </div>
-  <button class="prev-btn">Previous</button>
-  <button class="next-btn">Next</button>
-</div>
-
-<script>
-  const infiniteCarousel = new Swipix({
-    container: '#infinite-carousel',
-    nextButton: '.next-btn', 
-    prevButton: '.prev-btn',
-    infiniteLoop: true,
-    speed: 300,
-    slidesPerView: { 
-      default: 1,
-      768: 2
-    },
-    gap: 15
-  }).init();
-</script>
-```
-
-### Tabs Integration
-
-```html
-<div class="tabs-container">
-  <button class="tab-btn">Section 1</button>
-  <button class="tab-btn">Section 2</button>
-</div>
-
-<div class="pix-container" id="tabs-carousel">
-  <div class="pix-wrapper">
-    <div class="pix-slide">Slide 1</div>
-    <div class="pix-slide">Slide 2</div>
-    <div class="pix-slide">Slide 3</div>
-    <div class="pix-slide">Slide 4</div>
-    <div class="pix-slide">Slide 5</div>
-    <div class="pix-slide">Slide 6</div>
-  </div>
-  <button class="prev-btn">Previous</button>
-  <button class="next-btn">Next</button>
-</div>
-
-<script>
-  const tabsCarousel = new Swipix({
-    container: '#tabs-carousel',
-    nextButton: '.next-btn', 
-    prevButton: '.prev-btn',
-    infiniteLoop: true,
-    slidesPerView: { default: 1 },
-    tabsConfig: {
-      container: '.tabs-container',
-      buttonSelector: '.tab-btn',
-      mapping: [0, 3],
-      rangeMapping: true
-    }
-  }).init();
-</script>
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Carousel Not Initializing**
-   - Check that selectors match your HTML structure
-   - Ensure script is loaded after the HTML elements
-   - Verify there are no JavaScript errors in the console
-
-2. **Infinite Loop Not Working Properly**
-   - Check the responsive configuration to ensure enough slides exist
-   - Verify `infiniteLoop` is set to `true`
-   - Make sure there are enough slides for the feature to work properly
-
-3. **Tabs Not Syncing with Carousel**
-   - Verify tab container selector is correct
-   - Check that the mapping array is configured properly
-   - Ensure that you have the correct number of tab buttons
-
-### Debugging Tips
-
-- Use browser developer tools to inspect the DOM structure
-- Monitor the `swipix:slideChanged` events to track carousel state
-- Check for CSS issues that might affect carousel appearance
-
-## Advanced Customization
-
-### Custom Event Handlers
+### Infinite Loop with Multiple Visible Slides
 
 ```javascript
-const carousel = new Swipix({
-  container: '#carousel',
-  // other config...
+const infiniteCarousel = new Swipix({
+  container: '#infinite-carousel',
+  nextButton: '.next-btn',
+  prevButton: '.prev-btn',
+  infiniteLoop: true,
+  slidesPerView: { default: 1, 768: 2, 1024: 3 },
+  gap: 10
 }).init();
-
-document.querySelector('#carousel').addEventListener('swipix:slideChanged', (event) => {
-  // Custom logic here
-  updateProgressBar(event.detail.currentIndex);
-});
 ```
 
-### Styling Recommendations
+### Carousel with Tabs
 
-For the best performance and appearance:
+```javascript
+const tabCarousel = new Swipix({
+  container: '#tab-carousel',
+  tabsConfig: {
+    container: '.tabs-container',
+    buttonSelector: '.tab-btn',
+    activeClass: 'active'
+  }
+}).init();
+```
 
-1. Use the CSS structure demonstrated in the examples
-2. Keep all position-critical styles in JavaScript (handled by the library)
-3. Apply custom styles to `.pix-slide` for appearance
-4. Use `active` class provided by the library for active state styling
+### Autoplay Carousel with Lazy Loading
+
+```javascript
+const autoplayLazyCarousel = new Swipix({
+  container: '#autoplay-lazy-carousel',
+  autoplay: { enabled: true, delay: 3000, pauseOnInteraction: true },
+  lazyMedia: true
+}).init();
+```
+
+## Browser Support
+
+Swipix works in all modern browsers that support:
+- ES6 features
+- CSS3 transitions
+- IntersectionObserver API (for lazy loading features)
+
+## License
+
+MIT License

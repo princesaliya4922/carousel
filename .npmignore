@@ -1,0 +1,15 @@
+# Ignore build dependencies
+node_modules/
+src/
+
+# Ignore config and unnecessary files
+rollup.config.js
+
+# Ignore development/testing files
+index.html
+tab.html
+updatedIndex.html
+script.js
+
+# Ignore lock file (optional, npm will regenerate it)
+package-lock.json

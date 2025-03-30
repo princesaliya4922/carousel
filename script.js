@@ -1,6 +1,6 @@
 /**
  * Swipix - A customizable carousel library
- * Supports infinite looping, built-in tabs (with optional range mapping),
+ * Supports infinite looping, built-in tabs (with optional range mapping and multiple tab groups),
  * and autoplay with pause on interaction.
  */
 class Swipix {
@@ -16,15 +16,11 @@ class Swipix {
    * @param {Object} config.slidesPerView - Number of slides to show based on viewport (e.g., { default: 1, 768: 2, 1024: 3 })
    * @param {number} config.gap - Gap between slides in pixels
    * @param {number} config.slidesToMove - Number of slides to move per navigation action
-   * @param {Object} [config.tabsConfig] - Optional configuration for tab buttons
-   *    Example:
-   *    {
-   *      container: '.tabs-container',
-   *      buttonSelector: '.tab-btn', // optional
-   *      mapping: [0, 4],            // optional (with rangeMapping, mapping values set thresholds)
-   *      rangeMapping: true,         // optional: if true, mapping values are treated as thresholds
-   *      activeClass: 'active'       // optional
-   *    }
+   * @param {Object|Array} [config.tabsConfig] - Optional configuration for tab buttons.
+   *     If provided as an object, one tab group is used.
+   *     If an array, each object defines a separate tab group.
+   *     Example:
+   *       { container: '.tabs-container', buttonSelector: '.tab-btn', mapping: [0, 4], rangeMapping: true, activeClass: 'active' }
    * @param {Object} [config.autoplay] - Autoplay configuration: { enabled: true, delay: 3000, pauseOnInteraction: true }
    */
   constructor(config) {
@@ -109,7 +105,8 @@ class Swipix {
       isInfinite: this.config.infiniteLoop,
       clonedSlides: [], // Track cloned slides
       realSlidesOffset: 0, // Offset for the real slides when using infiniteLoop
-      autoplayInterval: null
+      autoplayInterval: null,
+      tabGroups: []  // Array to hold multiple tab groups if provided
     };
 
     this.state.carousels.push(carouselData);
@@ -131,9 +128,9 @@ class Swipix {
     // Initialize touch/drag events
     this._initTouchEvents(carouselData);
 
-    // Initialize tabs if configured
-    if (this.config.tabsConfig && this.config.tabsConfig.container) {
-      this._initTabs(carouselData);
+    // Initialize tab groups if configured
+    if (this.config.tabsConfig) {
+      this._initTabsGroups(carouselData);
     }
 
     // Setup autoplay pause/resume events if pauseOnInteraction is enabled
@@ -144,107 +141,100 @@ class Swipix {
   }
 
   /**
-   * Setup autoplay for a carousel
-   * @param {Object} carouselData - Data for a specific carousel
+   * Initialize tab groups based on tabsConfig.
+   * Accepts a single object or an array of objects.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
-  _setupAutoplay(carouselData) {
-    this._startAutoplay(carouselData);
-  }
-
-  /**
-   * Start autoplay for a carousel
-   * @param {Object} carouselData - Data for a specific carousel
-   * @private
-   */
-  _startAutoplay(carouselData) {
-    if (carouselData.autoplayInterval) return;
-    carouselData.autoplayInterval = setInterval(() => {
-      this.next(carouselData.container);
-    }, this.config.autoplay.delay);
-  }
-
-  /**
-   * Pause autoplay for a carousel
-   * @param {Object} carouselData - Data for a specific carousel
-   * @private
-   */
-  _pauseAutoplay(carouselData) {
-    clearInterval(carouselData.autoplayInterval);
-    carouselData.autoplayInterval = null;
-  }
-
-  /**
-   * Initialize tab buttons functionality based on tabsConfig
-   * @param {Object} carouselData - Data for a specific carousel
-   * @private
-   */
-  _initTabs(carouselData) {
-    const tabsConf = this.config.tabsConfig;
-    const tabsContainer = document.querySelector(tabsConf.container);
-    if (!tabsContainer) {
-      console.warn(`Tabs container not found for selector ${tabsConf.container}`);
+  _initTabsGroups(carouselData) {
+    const tabsConfigOption = this.config.tabsConfig;
+    let tabConfigs = [];
+    if (Array.isArray(tabsConfigOption)) {
+      tabConfigs = tabsConfigOption;
+    } else if (tabsConfigOption && typeof tabsConfigOption === 'object') {
+      tabConfigs = [tabsConfigOption];
+    } else {
       return;
     }
 
-    let buttons;
-    if (tabsConf.buttonSelector) {
-      buttons = tabsContainer.querySelectorAll(tabsConf.buttonSelector);
-    } else {
-      buttons = tabsContainer.children;
-    }
-    buttons = Array.from(buttons);
+    carouselData.tabGroups = [];
 
-    // Save tabs info in carouselData for later use
-    carouselData.tabsConfig = tabsConf;
-    carouselData.tabsContainer = tabsContainer;
-    carouselData.tabButtons = buttons;
+    tabConfigs.forEach(config => {
+      const tabsContainer = document.querySelector(config.container);
+      if (!tabsContainer) {
+        console.warn(`Tabs container not found for selector ${config.container}`);
+        return;
+      }
+      let buttons;
+      if (config.buttonSelector) {
+        buttons = tabsContainer.querySelectorAll(config.buttonSelector);
+      } else {
+        buttons = tabsContainer.children;
+      }
+      buttons = Array.from(buttons);
 
-    // Attach click events for each tab button
-    buttons.forEach((btn, index) => {
-      btn.addEventListener('click', () => {
-        // Determine target slide from mapping if provided, else use button index
-        let targetSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
-          ? tabsConf.mapping[index]
-          : index;
-        if (targetSlide < 0 || targetSlide >= carouselData.totalSlides) {
-          console.warn(`Mapping for tab index ${index} is out-of-bound.`);
-          return;
-        }
-        this.slideTo(carouselData.container, targetSlide);
+      // Attach click events for each button in this group.
+      buttons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+          let targetSlide = config.mapping && Array.isArray(config.mapping)
+            ? config.mapping[index]
+            : index;
+          if (targetSlide < 0 || targetSlide >= carouselData.totalSlides) {
+            console.warn(`Mapping for tab index ${index} is out-of-bound.`);
+            return;
+          }
+          this.slideTo(carouselData.container, targetSlide);
+        });
       });
-    });
 
-    // Set initial active tab
-    this._updateTabsActive(carouselData);
+      // Save group info
+      carouselData.tabGroups.push({
+        container: tabsContainer,
+        buttons: buttons,
+        config: config
+      });
+
+      // Set initial active state for this group.
+      this._updateTabsActiveGroup(carouselData, config, buttons);
+    });
   }
 
   /**
-   * Update the active state of tab buttons based on the current slide
-   * @param {Object} carouselData - Data for a specific carousel
+   * Update active tab state for all tab groups of a carousel.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _updateTabsActive(carouselData) {
-    if (!carouselData.tabsConfig || !carouselData.tabButtons) return;
+    if (!carouselData.tabGroups) return;
+    carouselData.tabGroups.forEach(group => {
+      this._updateTabsActiveGroup(carouselData, group.config, group.buttons);
+    });
+  }
 
+  /**
+   * Update active state for a single tab group.
+   * @param {Object} carouselData - Data for a specific carousel.
+   * @param {Object} config - The tab group configuration.
+   * @param {Array} buttons - Array of button elements in this tab group.
+   * @private
+   */
+  _updateTabsActiveGroup(carouselData, config, buttons) {
     let activeIndex = carouselData.currentIndex;
     if (carouselData.isInfinite) {
       activeIndex = carouselData.currentIndex - carouselData.realSlidesOffset;
     }
     activeIndex = Math.max(0, Math.min(activeIndex, carouselData.totalSlides - 1));
 
-    const tabsConf = carouselData.tabsConfig;
-    const activeClass = tabsConf.activeClass || 'active';
+    const activeClass = config.activeClass || 'active';
 
-    // If rangeMapping is enabled, use mapping thresholds to determine active tab.
-    if (tabsConf.rangeMapping && Array.isArray(tabsConf.mapping) && tabsConf.mapping.length > 0) {
+    if (config.rangeMapping && Array.isArray(config.mapping) && config.mapping.length > 0) {
       let selectedTab = 0;
-      for (let i = 0; i < tabsConf.mapping.length; i++) {
-        if (activeIndex >= tabsConf.mapping[i]) {
+      for (let i = 0; i < config.mapping.length; i++) {
+        if (activeIndex >= config.mapping[i]) {
           selectedTab = i;
         }
       }
-      carouselData.tabButtons.forEach((btn, i) => {
+      buttons.forEach((btn, i) => {
         if (i === selectedTab) {
           btn.classList.add(activeClass);
         } else {
@@ -252,10 +242,9 @@ class Swipix {
         }
       });
     } else {
-      // Default (non-range): either use mapping equality or identity mapping.
-      carouselData.tabButtons.forEach((btn, i) => {
-        let mappedSlide = tabsConf.mapping && Array.isArray(tabsConf.mapping)
-          ? tabsConf.mapping[i]
+      buttons.forEach((btn, i) => {
+        let mappedSlide = config.mapping && Array.isArray(config.mapping)
+          ? config.mapping[i]
           : i;
         if (mappedSlide === activeIndex) {
           btn.classList.add(activeClass);
@@ -267,22 +256,21 @@ class Swipix {
   }
 
   /**
-   * Setup infinite loop by cloning slides and positioning them
-   * @param {Object} carouselData - Data for a specific carousel
+   * Setup infinite loop by cloning slides and positioning them.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _setupInfiniteLoop(carouselData) {
     const { wrapper, originalSlides } = carouselData;
 
-    // Clear any existing clones to avoid duplicates
+    // Clear any existing clones to avoid duplicates.
     this._clearClonedSlides(carouselData);
 
-    // Determine the maximum slides per view from breakpoints
     const breakpointValues = Object.values(this.config.slidesPerView);
     const maxSlidesPerView = Math.max(...breakpointValues);
     const cloneCount = maxSlidesPerView;
 
-    // Clone beginning slides and append to the end
+    // Clone beginning slides and append to the end.
     const beginClones = [];
     for (let i = 0; i < cloneCount; i++) {
       const slideIndex = i % originalSlides.length;
@@ -293,7 +281,7 @@ class Swipix {
       beginClones.push(clone);
     }
 
-    // Clone ending slides and prepend to the beginning
+    // Clone ending slides and prepend to the beginning.
     const endClones = [];
     for (let i = 0; i < cloneCount; i++) {
       const slideIndex = (originalSlides.length - 1 - i) % originalSlides.length;
@@ -311,8 +299,8 @@ class Swipix {
   }
 
   /**
-   * Clear cloned slides from the carousel
-   * @param {Object} carouselData - Data for a specific carousel
+   * Clear cloned slides from the carousel.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _clearClonedSlides(carouselData) {
@@ -329,8 +317,8 @@ class Swipix {
   }
 
   /**
-   * Apply necessary styles to carousel elements
-   * @param {Object} carouselData - Data for a specific carousel
+   * Apply necessary styles to carousel elements.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _applyStyles(carouselData) {
@@ -350,8 +338,8 @@ class Swipix {
   }
 
   /**
-   * Calculate dimensions for the carousel
-   * @param {Object} carouselData - Data for a specific carousel
+   * Calculate dimensions for the carousel.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _calculateDimensions(carouselData) {
@@ -389,8 +377,8 @@ class Swipix {
   }
 
   /**
-   * Position slides based on the current index
-   * @param {Object} carouselData - Data for a specific carousel
+   * Position slides based on the current index.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _positionSlides(carouselData) {
@@ -400,8 +388,8 @@ class Swipix {
   }
 
   /**
-   * Check if we need to reset position for infinite loop
-   * @param {Object} carouselData - Data for a specific carousel
+   * Check if we need to reset position for infinite loop.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _checkInfiniteLoopReset(carouselData) {
@@ -424,14 +412,15 @@ class Swipix {
   }
 
   /**
-   * Initialize navigation buttons
-   * @param {Object} carouselData - Data for a specific carousel
+   * Initialize navigation buttons.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _initNavigation(carouselData) {
     const { container } = carouselData;
     if (this.config.nextButton) {
-      const nextBtn = container.querySelector(this.config.nextButton) || document.querySelector(this.config.nextButton);
+      const nextBtn = container.querySelector(this.config.nextButton) ||
+                      document.querySelector(this.config.nextButton);
       if (nextBtn) {
         nextBtn.addEventListener('click', () => {
           this.next(container);
@@ -439,7 +428,8 @@ class Swipix {
       }
     }
     if (this.config.prevButton) {
-      const prevBtn = container.querySelector(this.config.prevButton) || document.querySelector(this.config.prevButton);
+      const prevBtn = container.querySelector(this.config.prevButton) ||
+                      document.querySelector(this.config.prevButton);
       if (prevBtn) {
         prevBtn.addEventListener('click', () => {
           this.prev(container);
@@ -449,8 +439,8 @@ class Swipix {
   }
 
   /**
-   * Initialize touch and mouse drag events for swipe functionality
-   * @param {Object} carouselData - Data for a specific carousel
+   * Initialize touch and mouse drag events for swipe functionality.
+   * @param {Object} carouselData - Data for a specific carousel.
    * @private
    */
   _initTouchEvents(carouselData) {
@@ -488,7 +478,9 @@ class Swipix {
       if (!isDragging) return;
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
       wrapper.style.cursor = 'grab';
-      const endX = e.type === 'touchend' ? (e.changedTouches ? e.changedTouches[0].clientX : moveX) : e.clientX || moveX;
+      const endX = e.type === 'touchend'
+        ? (e.changedTouches ? e.changedTouches[0].clientX : moveX)
+        : e.clientX || moveX;
       const diff = endX - startX;
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
       const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
@@ -505,8 +497,8 @@ class Swipix {
         this._positionSlides(carouselData);
       }
       isDragging = false;
-      const event = new CustomEvent('swipix:slideChanged', { 
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      const event = new CustomEvent('swipix:slideChanged', {
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
       document.dispatchEvent(event);
     };
@@ -526,7 +518,7 @@ class Swipix {
   }
 
   /**
-   * Handle window resize event
+   * Handle window resize event.
    * @private
    */
   _handleResize() {
@@ -536,9 +528,9 @@ class Swipix {
   }
 
   /**
-   * Get carousel data for a specific container
-   * @param {HTMLElement|string} container - Container element or selector
-   * @returns {Object|null} - Carousel data or null if not found
+   * Get carousel data for a specific container.
+   * @param {HTMLElement|string} container - Container element or selector.
+   * @returns {Object|null} - Carousel data or null if not found.
    * @private
    */
   _getCarouselData(container) {
@@ -549,9 +541,9 @@ class Swipix {
   }
 
   /**
-   * Move to the next slide
-   * @param {HTMLElement|string} container - Container element or selector
-   * @returns {Swipix} - Returns the carousel instance for chaining
+   * Move to the next slide.
+   * @param {HTMLElement|string} container - Container element or selector.
+   * @returns {Swipix} - Returns the carousel instance for chaining.
    */
   next(container) {
     const carouselData = this._getCarouselData(container);
@@ -583,8 +575,8 @@ class Swipix {
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('swipix:slideChanged', { 
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      const event = new CustomEvent('swipix:slideChanged', {
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
       document.dispatchEvent(event);
     }, this.config.speed);
@@ -592,9 +584,9 @@ class Swipix {
   }
 
   /**
-   * Move to the previous slide
-   * @param {HTMLElement|string} container - Container element or selector
-   * @returns {Swipix} - Returns the carousel instance for chaining
+   * Move to the previous slide.
+   * @param {HTMLElement|string} container - Container element or selector.
+   * @returns {Swipix} - Returns the carousel instance for chaining.
    */
   prev(container) {
     const carouselData = this._getCarouselData(container);
@@ -625,8 +617,8 @@ class Swipix {
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('swipix:slideChanged', { 
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      const event = new CustomEvent('swipix:slideChanged', {
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
       document.dispatchEvent(event);
     }, this.config.speed);
@@ -634,10 +626,10 @@ class Swipix {
   }
 
   /**
-   * Go to a specific slide by index (zero-based for real slides)
-   * @param {HTMLElement|string} container - Container element or selector
-   * @param {number} index - Target slide index (zero-based for real slides)
-   * @returns {Swipix} - Returns the carousel instance for chaining
+   * Go to a specific slide by index (zero-based for real slides).
+   * @param {HTMLElement|string} container - Container element or selector.
+   * @param {number} index - Target slide index (zero-based for real slides).
+   * @returns {Swipix} - Returns the carousel instance for chaining.
    */
   goTo(container, index) {
     const carouselData = this._getCarouselData(container);
@@ -662,19 +654,19 @@ class Swipix {
         this._checkInfiniteLoopReset(carouselData);
       }
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('swipix:slideChanged', { 
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      const event = new CustomEvent('swipix:slideChanged', {
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
       document.dispatchEvent(event);
     }, this.config.speed);
     return this;
   }
-  
+
   /**
-   * Slide to a specific slide by index (zero-based for real slides)
-   * @param {HTMLElement|string|number} container - Container element/selector or index if single carousel
-   * @param {number} [index] - Target slide index if container is provided
-   * @returns {Swipix} - Returns the carousel instance for chaining
+   * Slide to a specific slide by index (zero-based for real slides).
+   * @param {HTMLElement|string|number} container - Container element/selector or index if single carousel.
+   * @param {number} [index] - Target slide index if container is provided.
+   * @returns {Swipix} - Returns the carousel instance for chaining.
    */
   slideTo(container, index) {
     if (typeof container === 'number') {
@@ -700,8 +692,8 @@ class Swipix {
     setTimeout(() => {
       carouselData.isAnimating = false;
       this._updateTabsActive(carouselData);
-      const event = new CustomEvent('swipix:slideChanged', { 
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex } 
+      const event = new CustomEvent('swipix:slideChanged', {
+        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
       document.dispatchEvent(event);
     }, this.config.speed);
@@ -709,9 +701,9 @@ class Swipix {
   }
 
   /**
-   * Update carousel configuration
-   * @param {Object} newConfig - New configuration options
-   * @returns {Swipix} - Returns the carousel instance for chaining
+   * Update carousel configuration.
+   * @param {Object} newConfig - New configuration options.
+   * @returns {Swipix} - Returns the carousel instance for chaining.
    */
   updateConfig(newConfig) {
     const oldConfig = { ...this.config };
@@ -733,14 +725,11 @@ class Swipix {
           carouselData.realSlidesOffset = 0;
         }
       }
-
       this._applyStyles(carouselData);
       this._calculateDimensions(carouselData);
-
-      if (this.config.tabsConfig && this.config.tabsConfig.container) {
-        this._initTabs(carouselData);
+      if (this.config.tabsConfig) {
+        this._initTabsGroups(carouselData);
       }
-
       if (this.config.autoplay.enabled) {
         this._pauseAutoplay(carouselData);
         this._startAutoplay(carouselData);
@@ -751,7 +740,7 @@ class Swipix {
   }
 
   /**
-   * Destroy the carousel instance and clean up event listeners
+   * Destroy the carousel instance and clean up event listeners.
    */
   destroy() {
     window.removeEventListener('resize', this._handleResize.bind(this));

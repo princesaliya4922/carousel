@@ -113,7 +113,9 @@ class Swipix {
       autoplayInterval: null,
       autoplayHandlers: null,
       tabGroups: [],
-      isVisible: false
+      isVisible: false,
+      resizeObserver: null,
+      rAFRequested: false
     };
     this.state.carousels.push(carouselData);
     this._applyStyles(carouselData);
@@ -121,14 +123,12 @@ class Swipix {
       this._setupInfiniteLoop(carouselData);
     }
     this._calculateDimensions(carouselData);
-    // Disable transition temporarily to jump to the correct position without animation.
+    // Disable transition temporarily to position slides instantly.
     carouselData.wrapper.style.transition = 'none';
     this._positionSlides(carouselData);
-    // Force reflow.
-    void carouselData.wrapper.offsetWidth;
-    // Restore transition.
+    void carouselData.wrapper.offsetWidth; // Force reflow.
     carouselData.wrapper.style.transition = `transform ${this.config.speed}ms ease`;
-    // Reveal container after proper positioning.
+    // Reveal container after positioning is complete.
     if (this.config.infiniteLoop) {
       container.style.visibility = 'visible';
     }
@@ -140,6 +140,11 @@ class Swipix {
     if (this.config.lazyMedia) {
       this._observeVisibility(carouselData);
     }
+    // Set up ResizeObserver for container size changes.
+    carouselData.resizeObserver = new ResizeObserver(() => {
+      this._calculateDimensions(carouselData);
+    });
+    carouselData.resizeObserver.observe(container);
     if (this.config.autoplay.enabled && this.config.autoplay.pauseOnInteraction) {
       const pauseHandler = () => {
         this._pauseAutoplay(carouselData);
@@ -686,7 +691,8 @@ class Swipix {
   destroy() {
     window.removeEventListener('resize', this._handleResize.bind(this));
     this.state.carousels.forEach(carouselData => {
-      const { container, wrapper, slides, eventHandlers } = carouselData;
+      const { container, wrapper, slides, eventHandlers, resizeObserver } = carouselData;
+      if (resizeObserver) { resizeObserver.disconnect(); }
       if (carouselData.isInfinite) {
         this._clearClonedSlides(carouselData);
       }

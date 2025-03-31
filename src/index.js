@@ -229,7 +229,7 @@ class Swipix {
           }
         });
         
-        // Process videos
+        // Process videos - directly handle videos with data-src
         const videos = slide.querySelectorAll('video');
         videos.forEach(video => {
           if (video.hasAttribute('data-src')) {
@@ -239,20 +239,32 @@ class Swipix {
               video.removeAttribute('data-src');
               video.load();
             }
-          } else {
-            const sources = video.querySelectorAll('source[data-src]');
-            let updated = false;
-            sources.forEach(source => {
-              const dataSrc = source.getAttribute('data-src');
-              if (dataSrc && !source.getAttribute('src')) {
-                source.setAttribute('src', dataSrc);
-                source.removeAttribute('data-src');
-                updated = true;
-              }
-            });
-            if (updated) {
-              video.load();
+          } 
+          
+          // Always check for source elements with data-src, even if the video itself doesn't have data-src
+          const sources = video.querySelectorAll('source[data-src]');
+          let updated = false;
+          sources.forEach(source => {
+            const dataSrc = source.getAttribute('data-src');
+            if (dataSrc && !source.getAttribute('src')) {
+              source.setAttribute('src', dataSrc);
+              source.removeAttribute('data-src');
+              updated = true;
             }
+          });
+          
+          if (updated) {
+            // Ensure video loads after sources are updated
+            setTimeout(() => {
+              video.load();
+              // Try to play if it has autoplay attribute
+              if (video.hasAttribute('autoplay')) {
+                video.play().catch(e => {
+                  // Ignore autoplay errors (common due to browser restrictions)
+                  console.log('Autoplay prevented by browser policy');
+                });
+              }
+            }, 0);
           }
         });
       }

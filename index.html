@@ -776,11 +776,12 @@
       loop: false,
       infiniteLoop: false,
       speed: 300,
-      slidesPerView: { default: 1, 768: 2, 1024: 3 },
+      slidesPerView: { default: 1, 768: 2, 1024: 2.8 },
       gap: 10,
       slidesToMove: 1,
       lazyMedia: true,
-      lazyMediaOffset: 300 
+      lazyMediaOffset: 300, 
+      autoplay: { enabled: true, delay: 3000, pauseOnInteraction: true, pauseAfterInteraction: false }
     }).init();
 
     const lazypixCarousel = new Swipix({

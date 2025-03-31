@@ -22,6 +22,8 @@ class Swipix {
    * @param {number} [config.lazyMediaOffset] - Offset in pixels for triggering lazy media load (default: 100).
    * @param {boolean} [config.lazyPix] - When true, the carousel will not initialize until its container is near the viewport.
    * @param {number} [config.lazyPixOffset] - Offset in pixels used with IntersectionObserver to trigger lazy initialization (default: 150).
+   * @param {boolean} [config.dynamicHeight] - When true and slidesPerView is 1, container height adjusts to active slide.
+   * @param {number} [config.dynamicHeightBottomOffset] - Extra bottom offset (in pixels) added to the container height.
    */
   constructor(config) {
     this.config = {
@@ -39,6 +41,8 @@ class Swipix {
       lazyMediaOffset: 100,
       lazyPix: false,
       lazyPixOffset: 150,
+      dynamicHeight: false, // New: Enable dynamic height adjustment.
+      dynamicHeightBottomOffset: 0, // New: Additional bottom offset in pixels.
       ...config
     };
 
@@ -58,7 +62,6 @@ class Swipix {
     const containers = document.querySelectorAll(selector);
 
     containers.forEach(container => {
-      // If lazyPix is enabled, delay initialization using an observer.
       if (this.config.lazyPix) {
         this._observeInit(container);
       } else {
@@ -93,7 +96,6 @@ class Swipix {
       console.error('Carousel structure is invalid. Ensure you have .pix-wrapper and .pix-slide elements.');
       return;
     }
-    // If infiniteLoop is enabled, hide the container initially to prevent the flash of cloned slides.
     if (this.config.infiniteLoop) {
       container.style.visibility = 'hidden';
     }
@@ -121,12 +123,10 @@ class Swipix {
       this._setupInfiniteLoop(carouselData);
     }
     this._calculateDimensions(carouselData);
-    // Disable transition temporarily, position slides, force reflow, then restore transition.
     carouselData.wrapper.style.transition = 'none';
     this._positionSlides(carouselData);
     void carouselData.wrapper.offsetWidth;
     carouselData.wrapper.style.transition = `transform ${this.config.speed}ms ease`;
-    // Reveal the container once positioning is complete.
     if (this.config.infiniteLoop) {
       container.style.visibility = 'visible';
     }
@@ -192,14 +192,36 @@ class Swipix {
     const end = start + carouselData.slidesPerView;
     const visibleSlides = carouselData.slides.slice(start, end);
     visibleSlides.forEach(slide => {
-      const mediaElements = slide.querySelectorAll('img[data-src], video[data-src]');
-      mediaElements.forEach(media => {
-        const dataSrc = media.getAttribute('data-src');
-        if (dataSrc && !media.getAttribute('src')) {
-          media.setAttribute('src', dataSrc);
-          media.removeAttribute('data-src');
-          if (media.tagName.toLowerCase() === 'video') {
-            media.load();
+      const imgs = slide.querySelectorAll('img[data-src]');
+      imgs.forEach(img => {
+        const dataSrc = img.getAttribute('data-src');
+        if (dataSrc && !img.getAttribute('src')) {
+          img.setAttribute('src', dataSrc);
+          img.removeAttribute('data-src');
+        }
+      });
+      const videos = slide.querySelectorAll('video');
+      videos.forEach(video => {
+        if (video.hasAttribute('data-src')) {
+          const dataSrc = video.getAttribute('data-src');
+          if (dataSrc && !video.getAttribute('src')) {
+            video.setAttribute('src', dataSrc);
+            video.removeAttribute('data-src');
+            video.load();
+          }
+        } else {
+          const sources = video.querySelectorAll('source[data-src]');
+          let updated = false;
+          sources.forEach(source => {
+            const dataSrc = source.getAttribute('data-src');
+            if (dataSrc && !source.getAttribute('src')) {
+              source.setAttribute('src', dataSrc);
+              source.removeAttribute('data-src');
+              updated = true;
+            }
+          });
+          if (updated) {
+            video.load();
           }
         }
       });
@@ -242,11 +264,7 @@ class Swipix {
           this.slideTo(carouselData.container, targetSlide);
         });
       });
-      carouselData.tabGroups.push({
-        container: tabsContainer,
-        buttons: buttons,
-        config: config
-      });
+      carouselData.tabGroups.push({ container: tabsContainer, buttons, config });
       this._updateTabsActiveGroup(carouselData, config, buttons);
     });
   }
@@ -378,6 +396,35 @@ class Swipix {
       this._setupInfiniteLoop(carouselData);
     }
     this._positionSlides(carouselData);
+    // If dynamicHeight is enabled and only one slide is visible, adjust container height.
+    if (this.config.dynamicHeight && slidesPerView === 1) {
+      this._adjustContainerHeight(carouselData);
+    } else {
+      container.style.height = '';
+    }
+  }
+
+  // NEW: Adjust container height based on active slide, including borders, container paddings, and additional bottom offset.
+  _adjustContainerHeight(carouselData) {
+    const { container, slides, currentIndex } = carouselData;
+    const activeSlide = slides[currentIndex];
+    if (activeSlide) {
+      // Get active slide content height.
+      const slideContentHeight = activeSlide.scrollHeight;
+      // Get border widths of active slide.
+      const slideStyle = window.getComputedStyle(activeSlide);
+      const borderTop = parseFloat(slideStyle.borderTopWidth) || 0;
+      const borderBottom = parseFloat(slideStyle.borderBottomWidth) || 0;
+      // Get container padding (top and bottom).
+      const containerStyle = window.getComputedStyle(container);
+      const paddingTop = parseFloat(containerStyle.paddingTop) || 0;
+      const paddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+      // Get additional bottom offset.
+      const bottomOffset = parseFloat(this.config.dynamicHeightBottomOffset) || 0;
+      // Calculate total height.
+      const totalHeight = slideContentHeight + borderTop + borderBottom + paddingTop + paddingBottom + bottomOffset;
+      container.style.height = totalHeight + 'px';
+    }
   }
 
   _positionSlides(carouselData) {
@@ -386,6 +433,10 @@ class Swipix {
     wrapper.style.transform = `translateX(${translateX}px)`;
     if (this.config.lazyMedia && carouselData.isVisible) {
       this._lazyLoadMedia(carouselData);
+    }
+    // NEW: Adjust container height if dynamicHeight is enabled and only one slide is visible.
+    if (this.config.dynamicHeight && carouselData.slidesPerView === 1) {
+      this._adjustContainerHeight(carouselData);
     }
   }
 
@@ -413,17 +464,13 @@ class Swipix {
     if (this.config.nextButton) {
       const nextBtn = container.querySelector(this.config.nextButton) || document.querySelector(this.config.nextButton);
       if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-          this.next(container);
-        });
+        nextBtn.addEventListener('click', () => { this.next(container); });
       }
     }
     if (this.config.prevButton) {
       const prevBtn = container.querySelector(this.config.prevButton) || document.querySelector(this.config.prevButton);
       if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-          this.prev(container);
-        });
+        prevBtn.addEventListener('click', () => { this.prev(container); });
       }
     }
   }

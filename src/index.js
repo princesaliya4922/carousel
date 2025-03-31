@@ -58,6 +58,28 @@ class Swipix {
   }
 
   init(containerSelector = null) {
+    const styleId = 'swipix-init-styles';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .pix-wrapper {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease;
+      }
+      .pix-wrapper.swipix-initialized {
+        opacity: 1;
+        visibility: visible;
+      }
+      .pix-slide {
+        flex: 0 0 auto;
+        box-sizing: border-box;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
     const selector = containerSelector || this.config.container;
     const containers = document.querySelectorAll(selector);
 
@@ -523,17 +545,27 @@ class Swipix {
   }
 
   _positionSlides(carouselData) {
-    const { wrapper, currentIndex, slideWidth, gap } = carouselData;
-    const translateX = -currentIndex * (slideWidth + gap);
-    wrapper.style.transform = `translateX(${translateX}px)`;
-    if (this.config.lazyMedia && carouselData.isVisible) {
-      this._lazyLoadMedia(carouselData);
-    }
-    // NEW: Adjust container height if dynamicHeight is enabled and only one slide is visible.
-    if (this.config.dynamicHeight && carouselData.slidesPerView === 1) {
-      this._adjustContainerHeight(carouselData);
-    }
+  const { wrapper, currentIndex, slideWidth, gap } = carouselData;
+  const translateX = -currentIndex * (slideWidth + gap);
+  wrapper.style.transform = `translateX(${translateX}px)`;
+  
+  // Add initialized class to show the wrapper
+  if (!wrapper.classList.contains('swipix-initialized')) {
+    // Use setTimeout to allow browser to render slides before revealing
+    setTimeout(() => {
+      wrapper.classList.add('swipix-initialized');
+    }, 50);
   }
+  
+  if (this.config.lazyMedia && carouselData.isVisible) {
+    this._lazyLoadMedia(carouselData);
+  }
+  
+  // NEW: Adjust container height if dynamicHeight is enabled and only one slide is visible.
+  if (this.config.dynamicHeight && carouselData.slidesPerView === 1) {
+    this._adjustContainerHeight(carouselData);
+  }
+}
 
   _checkInfiniteLoopReset(carouselData) {
     if (!carouselData.isInfinite) return;
@@ -865,6 +897,9 @@ class Swipix {
       const { container, wrapper, slides, eventHandlers } = carouselData;
       if (carouselData.isInfinite) {
         this._clearClonedSlides(carouselData);
+      }
+      if (wrapper) {
+        wrapper.classList.remove('swipix-initialized');
       }
       container.style.overflow = '';
       container.style.position = '';

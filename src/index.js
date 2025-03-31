@@ -574,11 +574,24 @@ class Swipix {
     const { container, wrapper } = carouselData;
     let startX, startY, moveX, moveY, isDragging = false;
     let initialTransform = 0;
-    let isHorizontalSwipe = null; // Track if the current swipe is horizontal
+    let isHorizontalSwipe = null;
+    
+    // Track if we've moved enough to be considered a drag
+    let hasMoved = false;
+    const moveThreshold = 5; // pixels
+    
+    // Track when the drag started for click prevention
+    let dragStartTime = 0;
     
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
+      
+      // Store the start time
+      dragStartTime = Date.now();
+      
+      // Reset movement tracking
+      hasMoved = false;
       
       // Get both X and Y coordinates
       if (e.type === 'touchstart') {
@@ -587,7 +600,6 @@ class Swipix {
       } else {
         startX = e.clientX;
         startY = e.clientY;
-        // For mouse events, we can safely prevent default
         e.preventDefault();
       }
       
@@ -619,6 +631,11 @@ class Swipix {
       const deltaY = moveY - startY;
       const absDeltaX = Math.abs(deltaX);
       const absDeltaY = Math.abs(deltaY);
+      
+      // Check if we've moved enough to be considered a drag
+      if (!hasMoved && (absDeltaX > moveThreshold || absDeltaY > moveThreshold)) {
+        hasMoved = true;
+      }
       
       // Determine direction if not already determined
       if (isHorizontalSwipe === null) {
@@ -689,11 +706,29 @@ class Swipix {
       isHorizontalSwipe = null;
     };
     
+    // Add a click handler to prevent clicks after drag
+    const handleClick = (e) => {
+      // If the user has dragged, prevent the click
+      if (hasMoved) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      
+      // If this is a quick tap (not a long press), allow the click
+      const clickDuration = Date.now() - dragStartTime;
+      if (clickDuration > 300) { // 300ms is a reasonable threshold for a tap
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+    
     // For better compatibility with different browsers
     const passiveOptions = { passive: false };
     const passiveTrue = { passive: true };
     
-    // Touch events - passive: false for touchmove to allow preventDefault when needed
+    // Touch events
     container.addEventListener('touchstart', handleDragStart, passiveTrue);
     container.addEventListener('touchmove', handleDragMove, passiveOptions);
     container.addEventListener('touchend', handleDragEnd);
@@ -703,8 +738,16 @@ class Swipix {
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
     
+    // Add capture phase click handler to handle link clicks
+    container.addEventListener('click', handleClick, true);
+    
     wrapper.style.cursor = 'grab';
-    carouselData.eventHandlers = { handleDragStart, handleDragMove, handleDragEnd };
+    carouselData.eventHandlers = { 
+      handleDragStart, 
+      handleDragMove, 
+      handleDragEnd,
+      handleClick
+    };
   }
 
   _handleResize() {
@@ -937,6 +980,8 @@ class Swipix {
       if (carouselData.isInfinite) {
         this._clearClonedSlides(carouselData);
       }
+      
+      // Reset styles
       container.style.overflow = '';
       container.style.position = '';
       wrapper.style.display = '';
@@ -944,22 +989,29 @@ class Swipix {
       wrapper.style.transform = '';
       wrapper.style.willChange = '';
       wrapper.style.cursor = '';
+      
       slides.forEach(slide => {
         slide.style.flexShrink = '';
         slide.style.width = '';
         slide.style.marginRight = '';
       });
+      
+      // Clean up event listeners
       if (eventHandlers) {
-        container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: false });
-        container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: true });
+        container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: true });
+        container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: false });
         container.removeEventListener('touchend', eventHandlers.handleDragEnd);
         container.removeEventListener('mousedown', eventHandlers.handleDragStart);
         window.removeEventListener('mousemove', eventHandlers.handleDragMove);
         window.removeEventListener('mouseup', eventHandlers.handleDragEnd);
+        container.removeEventListener('click', eventHandlers.handleClick, true);
       }
+      
+      // Replace with a fresh clone
       const newContainer = container.cloneNode(true);
       container.parentNode.replaceChild(newContainer, container);
     });
+    
     this.state.carousels = [];
   }
 }

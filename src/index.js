@@ -572,66 +572,137 @@ class Swipix {
 
   _initTouchEvents(carouselData) {
     const { container, wrapper } = carouselData;
-    let startX, moveX, isDragging = false;
+    let startX, startY, moveX, moveY, isDragging = false;
     let initialTransform = 0;
+    let isHorizontalSwipe = null; // Track if the current swipe is horizontal
+    
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
-      e.preventDefault();
-      startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+      
+      // Get both X and Y coordinates
+      if (e.type === 'touchstart') {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      } else {
+        startX = e.clientX;
+        startY = e.clientY;
+        // For mouse events, we can safely prevent default
+        e.preventDefault();
+      }
+      
+      // Reset direction detection
+      isHorizontalSwipe = null;
       isDragging = true;
+      
       const transform = window.getComputedStyle(wrapper).getPropertyValue('transform');
       const matrix = new DOMMatrix(transform);
       initialTransform = matrix.m41;
       wrapper.style.transition = 'none';
       wrapper.style.cursor = 'grabbing';
     };
+    
     const handleDragMove = (e) => {
       if (!isDragging) return;
-      moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-      const diff = moveX - startX;
-      let adjustedDiff = diff;
-      if (!carouselData.isInfinite && !this.config.loop) {
-        const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-        if (carouselData.currentIndex === 0 && diff > 0) adjustedDiff = diff * 0.3;
-        if (carouselData.currentIndex === maxIndex && diff < 0) adjustedDiff = diff * 0.3;
+      
+      // Get current position
+      if (e.type === 'touchmove') {
+        moveX = e.touches[0].clientX;
+        moveY = e.touches[0].clientY;
+      } else {
+        moveX = e.clientX;
+        moveY = e.clientY;
       }
-      wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
+      
+      // Calculate movement deltas
+      const deltaX = moveX - startX;
+      const deltaY = moveY - startY;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      
+      // Determine direction if not already determined
+      if (isHorizontalSwipe === null) {
+        // If movement is very small, don't decide yet
+        if (absDeltaX < 5 && absDeltaY < 5) return;
+        
+        // Compare absolute deltas to determine direction
+        isHorizontalSwipe = absDeltaX > absDeltaY;
+        
+        // If it's not a horizontal swipe, exit without preventing default behavior
+        if (!isHorizontalSwipe) {
+          return;
+        }
+        
+        // Prevent default only for horizontal swipes to prevent page scrolling
+        if (e.type === 'touchmove' && isHorizontalSwipe) {
+          e.preventDefault();
+        }
+      }
+      
+      // Only update carousel position for horizontal swipes
+      if (isHorizontalSwipe) {
+        let adjustedDiff = deltaX;
+        if (!carouselData.isInfinite && !this.config.loop) {
+          const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+          if (carouselData.currentIndex === 0 && deltaX > 0) adjustedDiff = deltaX * 0.3;
+          if (carouselData.currentIndex === maxIndex && deltaX < 0) adjustedDiff = deltaX * 0.3;
+        }
+        wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
+      }
     };
+    
     const handleDragEnd = (e) => {
       if (!isDragging) return;
+      
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
       wrapper.style.cursor = 'grab';
-      const endX = e.type === 'touchend'
-        ? (e.changedTouches ? e.changedTouches[0].clientX : moveX)
-        : e.clientX || moveX;
-      const diff = endX - startX;
-      const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
-      const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
-      if (Math.abs(diff) > 50) {
-        if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
-          this.prev(container);
-        } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
-          this.next(container);
+      
+      // Only process horizontal swipes
+      if (isHorizontalSwipe) {
+        const endX = e.type === 'touchend'
+          ? (e.changedTouches ? e.changedTouches[0].clientX : moveX)
+          : e.clientX || moveX;
+        const diff = endX - startX;
+        const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+        const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
+        const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
+        
+        if (Math.abs(diff) > 50) {
+          if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
+            this.prev(container);
+          } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
+            this.next(container);
+          } else {
+            this._positionSlides(carouselData);
+          }
         } else {
           this._positionSlides(carouselData);
         }
-      } else {
-        this._positionSlides(carouselData);
+        
+        const event = new CustomEvent('swipix:slideChanged', {
+          detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
+        });
+        document.dispatchEvent(event);
       }
+      
       isDragging = false;
-      const event = new CustomEvent('swipix:slideChanged', {
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
-      });
-      document.dispatchEvent(event);
+      isHorizontalSwipe = null;
     };
-    container.addEventListener('touchstart', handleDragStart, { passive: false });
-    container.addEventListener('touchmove', handleDragMove, { passive: true });
+    
+    // For better compatibility with different browsers
+    const passiveOptions = { passive: false };
+    const passiveTrue = { passive: true };
+    
+    // Touch events - passive: false for touchmove to allow preventDefault when needed
+    container.addEventListener('touchstart', handleDragStart, passiveTrue);
+    container.addEventListener('touchmove', handleDragMove, passiveOptions);
     container.addEventListener('touchend', handleDragEnd);
+    
+    // Mouse events
     container.addEventListener('mousedown', handleDragStart);
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+    
     wrapper.style.cursor = 'grab';
     carouselData.eventHandlers = { handleDragStart, handleDragMove, handleDragEnd };
   }

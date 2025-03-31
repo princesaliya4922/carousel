@@ -154,6 +154,13 @@ class Swipix {
       container.addEventListener('mouseenter', pauseHandler);
       container.addEventListener('mouseleave', resumeHandler);
     }
+
+    // Add a listener for the slide changed event to update lazy media
+    document.addEventListener('swipix:slideChanged', (event) => {
+      if (event.detail.container === carouselData.container && this.config.lazyMedia && carouselData.isVisible) {
+        this._lazyLoadMedia(carouselData);
+      }
+    });
   }
 
   _observeVisibility(carouselData) {
@@ -162,10 +169,16 @@ class Swipix {
       entries.forEach(entry => {
         carouselData.isVisible = entry.isIntersecting;
         if (entry.isIntersecting && this.config.lazyMedia) {
-          this._lazyLoadMedia(carouselData);
+          // Use a small timeout to ensure DOM is ready
+          setTimeout(() => {
+            this._lazyLoadMedia(carouselData);
+          }, 10);
         }
       });
-    }, { threshold: 0.1, rootMargin: `${this.config.lazyMediaOffset}px` });
+    }, { 
+      threshold: [0, 0.1, 0.5, 1], // Add multiple thresholds to detect partial visibility
+      rootMargin: `${this.config.lazyMediaOffset}px` 
+    });
     observer.observe(container);
     carouselData.visibilityObserver = observer;
   }
@@ -188,43 +201,61 @@ class Swipix {
 
   _lazyLoadMedia(carouselData) {
     if (!carouselData.isVisible) return;
-    const start = carouselData.currentIndex;
-    const end = start + carouselData.slidesPerView;
-    const visibleSlides = carouselData.slides.slice(start, end);
-    visibleSlides.forEach(slide => {
-      const imgs = slide.querySelectorAll('img[data-src]');
-      imgs.forEach(img => {
-        const dataSrc = img.getAttribute('data-src');
-        if (dataSrc && !img.getAttribute('src')) {
-          img.setAttribute('src', dataSrc);
-          img.removeAttribute('data-src');
-        }
-      });
-      const videos = slide.querySelectorAll('video');
-      videos.forEach(video => {
-        if (video.hasAttribute('data-src')) {
-          const dataSrc = video.getAttribute('data-src');
-          if (dataSrc && !video.getAttribute('src')) {
-            video.setAttribute('src', dataSrc);
-            video.removeAttribute('data-src');
-            video.load();
+    
+    const { container, wrapper, slides, slideWidth, gap, currentIndex } = carouselData;
+    
+    // Calculate the current visible area
+    const containerRect = container.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    
+    // Check each slide to see if it's visible or partially visible
+    slides.forEach((slide, index) => {
+      const slideRect = slide.getBoundingClientRect();
+      
+      // Check if the slide is at least partially visible in the container
+      const isVisible = !(
+        slideRect.right <= containerRect.left || 
+        slideRect.left >= containerRect.right
+      );
+      
+      if (isVisible) {
+        // Process images
+        const imgs = slide.querySelectorAll('img[data-src]');
+        imgs.forEach(img => {
+          const dataSrc = img.getAttribute('data-src');
+          if (dataSrc && !img.getAttribute('src')) {
+            img.setAttribute('src', dataSrc);
+            img.removeAttribute('data-src');
           }
-        } else {
-          const sources = video.querySelectorAll('source[data-src]');
-          let updated = false;
-          sources.forEach(source => {
-            const dataSrc = source.getAttribute('data-src');
-            if (dataSrc && !source.getAttribute('src')) {
-              source.setAttribute('src', dataSrc);
-              source.removeAttribute('data-src');
-              updated = true;
+        });
+        
+        // Process videos
+        const videos = slide.querySelectorAll('video');
+        videos.forEach(video => {
+          if (video.hasAttribute('data-src')) {
+            const dataSrc = video.getAttribute('data-src');
+            if (dataSrc && !video.getAttribute('src')) {
+              video.setAttribute('src', dataSrc);
+              video.removeAttribute('data-src');
+              video.load();
             }
-          });
-          if (updated) {
-            video.load();
+          } else {
+            const sources = video.querySelectorAll('source[data-src]');
+            let updated = false;
+            sources.forEach(source => {
+              const dataSrc = source.getAttribute('data-src');
+              if (dataSrc && !source.getAttribute('src')) {
+                source.setAttribute('src', dataSrc);
+                source.removeAttribute('data-src');
+                updated = true;
+              }
+            });
+            if (updated) {
+              video.load();
+            }
           }
-        }
-      });
+        });
+      }
     });
   }
 
@@ -585,8 +616,16 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
+
+      // Add this inside the setTimeout callback of next(), prev() and slideTo()
+      if (this.config.lazyMedia && carouselData.isVisible) {
+        this._lazyLoadMedia(carouselData);
+      }
+
       document.dispatchEvent(event);
     }, this.config.speed);
+
+    
     return this;
   }
 
@@ -620,6 +659,12 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
+
+      // Add this inside the setTimeout callback of next(), prev() and slideTo()
+      if (this.config.lazyMedia && carouselData.isVisible) {
+        this._lazyLoadMedia(carouselData);
+      }
+
       document.dispatchEvent(event);
     }, this.config.speed);
     return this;
@@ -681,6 +726,10 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
+      // Add this inside the setTimeout callback of next(), prev() and slideTo()
+      if (this.config.lazyMedia && carouselData.isVisible) {
+        this._lazyLoadMedia(carouselData);
+      }
       document.dispatchEvent(event);
     }, this.config.speed);
     return this;

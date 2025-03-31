@@ -77,6 +77,16 @@ class Swipix {
     return this;
   }
 
+  _isElementInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    return (
+      rect.top < window.innerHeight &&
+      rect.bottom > 0 &&
+      rect.left < window.innerWidth &&
+      rect.right > 0
+    );
+  }
+
   _observeInit(container) {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -117,6 +127,7 @@ class Swipix {
       tabGroups: [],
       isVisible: false
     };
+    carouselData.isVisible = false;
     this.state.carousels.push(carouselData);
     this._applyStyles(carouselData);
     if (this.config.infiniteLoop) {
@@ -164,23 +175,63 @@ class Swipix {
   }
 
   _observeVisibility(carouselData) {
+    // Set initial visibility to false explicitly
+    carouselData.isVisible = false;
+    
     const container = carouselData.container;
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        carouselData.isVisible = entry.isIntersecting;
-        if (entry.isIntersecting && this.config.lazyMedia) {
-          // Use a small timeout to ensure DOM is ready
+        // Only update visibility if it's actually changing
+        const wasVisible = carouselData.isVisible;
+        const isNowVisible = entry.isIntersecting;
+        
+        if (!wasVisible && isNowVisible) {
+          // Transitioning from not visible to visible
+          carouselData.isVisible = true;
+          
+          // Delay lazy loading to ensure all calculations are complete
           setTimeout(() => {
-            this._lazyLoadMedia(carouselData);
-          }, 10);
+            if (this.config.lazyMedia && carouselData.isVisible) {
+              this._lazyLoadMedia(carouselData);
+            }
+          }, 100);
+        } else if (wasVisible && !isNowVisible) {
+          // Transitioning from visible to not visible
+          carouselData.isVisible = false;
         }
       });
     }, { 
-      threshold: [0, 0.1, 0.5, 1], // Add multiple thresholds to detect partial visibility
+      threshold: 0.1, // Simplified threshold
       rootMargin: `${this.config.lazyMediaOffset}px` 
     });
+    
     observer.observe(container);
     carouselData.visibilityObserver = observer;
+    
+    // Handle the case when carousel is already in view on initial load
+    if (document.readyState !== 'loading') {
+      // Set a longer timeout to ensure all calculations are complete
+      setTimeout(() => {
+        if (this._isElementInViewport(container)) {
+          carouselData.isVisible = true;
+          if (this.config.lazyMedia) {
+            this._lazyLoadMedia(carouselData);
+          }
+        }
+      }, 300);
+    } else {
+      // Wait for page load
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (this._isElementInViewport(container)) {
+            carouselData.isVisible = true;
+            if (this.config.lazyMedia) {
+              this._lazyLoadMedia(carouselData);
+            }
+          }
+        }, 300);
+      }, { once: true });
+    }
   }
 
   _setupAutoplay(carouselData) {
@@ -202,21 +253,22 @@ class Swipix {
   _lazyLoadMedia(carouselData) {
     if (!carouselData.isVisible) return;
     
+    // Ensure dimensions are fully calculated
+    if (!carouselData.slideWidth || carouselData.slideWidth <= 0) {
+      this._calculateDimensions(carouselData);
+      return; // Exit and wait for next call when dimensions are ready
+    }
+    
     const { container, wrapper, slides, slideWidth, gap, currentIndex } = carouselData;
     
-    // Calculate the current visible area
-    const containerRect = container.getBoundingClientRect();
-    const wrapperRect = wrapper.getBoundingClientRect();
+    // Get accurate visible range based on current index and slidesPerView
+    const visibleStart = currentIndex;
+    const visibleEnd = Math.min(currentIndex + carouselData.slidesPerView, slides.length);
     
-    // Check each slide to see if it's visible or partially visible
+    // Only process slides that are in the visible range
     slides.forEach((slide, index) => {
-      const slideRect = slide.getBoundingClientRect();
-      
-      // Check if the slide is at least partially visible in the container
-      const isVisible = !(
-        slideRect.right <= containerRect.left || 
-        slideRect.left >= containerRect.right
-      );
+      // Only consider slides that are within the current view
+      const isVisible = index >= visibleStart && index < visibleEnd;
       
       if (isVisible) {
         // Process images
@@ -241,7 +293,7 @@ class Swipix {
             }
           } 
           
-          // Always check for source elements with data-src, even if the video itself doesn't have data-src
+          // Process source elements within videos
           const sources = video.querySelectorAll('source[data-src]');
           let updated = false;
           sources.forEach(source => {

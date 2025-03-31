@@ -275,7 +275,7 @@ class Swipix {
         const imgs = slide.querySelectorAll('img[data-src]');
         imgs.forEach(img => {
           const dataSrc = img.getAttribute('data-src');
-          if (dataSrc && !img.getAttribute('src')) {
+          if (dataSrc) {
             img.setAttribute('src', dataSrc);
             img.removeAttribute('data-src');
           }
@@ -286,7 +286,7 @@ class Swipix {
         videos.forEach(video => {
           if (video.hasAttribute('data-src')) {
             const dataSrc = video.getAttribute('data-src');
-            if (dataSrc && !video.getAttribute('src')) {
+            if (dataSrc) {
               video.setAttribute('src', dataSrc);
               video.removeAttribute('data-src');
               video.load();
@@ -298,7 +298,7 @@ class Swipix {
           let updated = false;
           sources.forEach(source => {
             const dataSrc = source.getAttribute('data-src');
-            if (dataSrc && !source.getAttribute('src')) {
+            if (dataSrc) {
               source.setAttribute('src', dataSrc);
               source.removeAttribute('data-src');
               updated = true;

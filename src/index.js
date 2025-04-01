@@ -769,23 +769,24 @@ class Swipix {
     carouselData.isAnimating = true;
     const slidesToMove = this.config.slidesToMove;
     if (carouselData.isInfinite) {
+      // Infinite loop: use original behavior.
       carouselData.currentIndex += slidesToMove;
     } else {
       const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      if (carouselData.currentIndex + slidesToMove > maxIndex) {
-        if (this.config.loop) {
-          carouselData.currentIndex = 0;
-        } else {
-          carouselData.currentIndex = maxIndex;
-          carouselData.isAnimating = false;
-          return this;
-        }
+      const remaining = maxIndex - carouselData.currentIndex;
+      if (remaining <= 0) {
+        carouselData.currentIndex = maxIndex;
+        carouselData.isAnimating = false;
+        return this;
+      } else if (remaining < slidesToMove) {
+        // Move only the remaining distance so the last slide is fully visible.
+        carouselData.currentIndex += remaining;
       } else {
         carouselData.currentIndex += slidesToMove;
       }
     }
     this._positionSlides(carouselData);
-    if (carouselData.isInfinite) {
+    if (carouselData.isInfinite || carouselData.loop) {
       setTimeout(() => { this._checkInfiniteLoopReset(carouselData); }, this.config.speed);
     }
     setTimeout(() => {
@@ -794,16 +795,11 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
-
-      // Add this inside the setTimeout callback of next(), prev() and slideTo()
       if (this.config.lazyMedia && carouselData.isVisible) {
         this._lazyLoadMedia(carouselData);
       }
-
       document.dispatchEvent(event);
     }, this.config.speed);
-
-    
     return this;
   }
 
@@ -813,16 +809,15 @@ class Swipix {
     carouselData.isAnimating = true;
     const slidesToMove = this.config.slidesToMove;
     if (carouselData.isInfinite) {
+      // Infinite loop: use original behavior.
       carouselData.currentIndex -= slidesToMove;
     } else {
-      if (carouselData.currentIndex - slidesToMove < 0) {
-        if (this.config.loop) {
-          carouselData.currentIndex = carouselData.totalSlides - carouselData.slidesPerView;
-        } else {
-          carouselData.currentIndex = 0;
-          carouselData.isAnimating = false;
-          return this;
-        }
+      if (carouselData.currentIndex <= 0) {
+        carouselData.currentIndex = 0;
+        carouselData.isAnimating = false;
+        return this;
+      } else if (carouselData.currentIndex < slidesToMove) {
+        carouselData.currentIndex = 0;
       } else {
         carouselData.currentIndex -= slidesToMove;
       }
@@ -837,12 +832,9 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
-
-      // Add this inside the setTimeout callback of next(), prev() and slideTo()
       if (this.config.lazyMedia && carouselData.isVisible) {
         this._lazyLoadMedia(carouselData);
       }
-
       document.dispatchEvent(event);
     }, this.config.speed);
     return this;
@@ -887,13 +879,14 @@ class Swipix {
     const carouselData = this._getCarouselData(container);
     if (!carouselData || carouselData.isAnimating) return this;
     carouselData.isAnimating = true;
-    const totalRealSlides = carouselData.totalSlides;
-    const targetRealIndex = Math.max(0, Math.min(index, totalRealSlides - 1));
-    let targetIndex = targetRealIndex;
     if (carouselData.isInfinite) {
-      targetIndex = targetRealIndex + carouselData.realSlidesOffset;
+      // In infinite mode, ignore clamping and add the real slides offset.
+      carouselData.currentIndex = index + carouselData.realSlidesOffset;
+    } else {
+      const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+      const targetRealIndex = Math.max(0, Math.min(index, maxIndex));
+      carouselData.currentIndex = targetRealIndex;
     }
-    carouselData.currentIndex = targetIndex;
     this._positionSlides(carouselData);
     if (carouselData.isInfinite) {
       setTimeout(() => { this._checkInfiniteLoopReset(carouselData); }, this.config.speed);
@@ -904,7 +897,6 @@ class Swipix {
       const event = new CustomEvent('swipix:slideChanged', {
         detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
       });
-      // Add this inside the setTimeout callback of next(), prev() and slideTo()
       if (this.config.lazyMedia && carouselData.isVisible) {
         this._lazyLoadMedia(carouselData);
       }

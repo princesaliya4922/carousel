@@ -572,68 +572,182 @@ class Swipix {
 
   _initTouchEvents(carouselData) {
     const { container, wrapper } = carouselData;
-    let startX, moveX, isDragging = false;
+    let startX, startY, moveX, moveY, isDragging = false;
     let initialTransform = 0;
+    let isHorizontalSwipe = null;
+    
+    // Track if we've moved enough to be considered a drag
+    let hasMoved = false;
+    const moveThreshold = 5; // pixels
+    
+    // Track when the drag started for click prevention
+    let dragStartTime = 0;
+    
     const handleDragStart = (e) => {
       const targetTag = e.target.tagName.toLowerCase();
       if (['input', 'button', 'select', 'textarea'].includes(targetTag)) return;
-      e.preventDefault();
-      startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+      
+      // Store the start time
+      dragStartTime = Date.now();
+      
+      // Reset movement tracking
+      hasMoved = false;
+      
+      // Get both X and Y coordinates
+      if (e.type === 'touchstart') {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      } else {
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+      }
+      
+      // Reset direction detection
+      isHorizontalSwipe = null;
       isDragging = true;
+      
       const transform = window.getComputedStyle(wrapper).getPropertyValue('transform');
       const matrix = new DOMMatrix(transform);
       initialTransform = matrix.m41;
       wrapper.style.transition = 'none';
       wrapper.style.cursor = 'grabbing';
     };
+    
     const handleDragMove = (e) => {
       if (!isDragging) return;
-      moveX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-      const diff = moveX - startX;
-      let adjustedDiff = diff;
-      if (!carouselData.isInfinite && !this.config.loop) {
-        const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-        if (carouselData.currentIndex === 0 && diff > 0) adjustedDiff = diff * 0.3;
-        if (carouselData.currentIndex === maxIndex && diff < 0) adjustedDiff = diff * 0.3;
+      
+      // Get current position
+      if (e.type === 'touchmove') {
+        moveX = e.touches[0].clientX;
+        moveY = e.touches[0].clientY;
+      } else {
+        moveX = e.clientX;
+        moveY = e.clientY;
       }
-      wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
+      
+      // Calculate movement deltas
+      const deltaX = moveX - startX;
+      const deltaY = moveY - startY;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      
+      // Check if we've moved enough to be considered a drag
+      if (!hasMoved && (absDeltaX > moveThreshold || absDeltaY > moveThreshold)) {
+        hasMoved = true;
+      }
+      
+      // Determine direction if not already determined
+      if (isHorizontalSwipe === null) {
+        // If movement is very small, don't decide yet
+        if (absDeltaX < 5 && absDeltaY < 5) return;
+        
+        // Compare absolute deltas to determine direction
+        isHorizontalSwipe = absDeltaX > absDeltaY;
+        
+        // If it's not a horizontal swipe, exit without preventing default behavior
+        if (!isHorizontalSwipe) {
+          return;
+        }
+        
+        // Prevent default only for horizontal swipes to prevent page scrolling
+        if (e.type === 'touchmove' && isHorizontalSwipe) {
+          e.preventDefault();
+        }
+      }
+      
+      // Only update carousel position for horizontal swipes
+      if (isHorizontalSwipe) {
+        let adjustedDiff = deltaX;
+        if (!carouselData.isInfinite && !this.config.loop) {
+          const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+          if (carouselData.currentIndex === 0 && deltaX > 0) adjustedDiff = deltaX * 0.3;
+          if (carouselData.currentIndex === maxIndex && deltaX < 0) adjustedDiff = deltaX * 0.3;
+        }
+        wrapper.style.transform = `translateX(${initialTransform + adjustedDiff}px)`;
+      }
     };
+    
     const handleDragEnd = (e) => {
       if (!isDragging) return;
+      
       wrapper.style.transition = `transform ${this.config.speed}ms ease`;
       wrapper.style.cursor = 'grab';
-      const endX = e.type === 'touchend'
-        ? (e.changedTouches ? e.changedTouches[0].clientX : moveX)
-        : e.clientX || moveX;
-      const diff = endX - startX;
-      const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
-      const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
-      const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
-      if (Math.abs(diff) > 50) {
-        if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
-          this.prev(container);
-        } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
-          this.next(container);
+      
+      // Only process horizontal swipes
+      if (isHorizontalSwipe) {
+        const endX = e.type === 'touchend'
+          ? (e.changedTouches ? e.changedTouches[0].clientX : moveX)
+          : e.clientX || moveX;
+        const diff = endX - startX;
+        const maxIndex = carouselData.totalSlides - carouselData.slidesPerView;
+        const isAtStart = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset : 0);
+        const isAtEnd = carouselData.currentIndex === (carouselData.isInfinite ? carouselData.realSlidesOffset + maxIndex : maxIndex);
+        
+        if (Math.abs(diff) > 50) {
+          if (diff > 0 && (!isAtStart || this.config.loop || carouselData.isInfinite)) {
+            this.prev(container);
+          } else if (diff < 0 && (!isAtEnd || this.config.loop || carouselData.isInfinite)) {
+            this.next(container);
+          } else {
+            this._positionSlides(carouselData);
+          }
         } else {
           this._positionSlides(carouselData);
         }
-      } else {
-        this._positionSlides(carouselData);
+        
+        const event = new CustomEvent('swipix:slideChanged', {
+          detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
+        });
+        document.dispatchEvent(event);
       }
+      
       isDragging = false;
-      const event = new CustomEvent('swipix:slideChanged', {
-        detail: { carousel: this, container, currentIndex: carouselData.currentIndex }
-      });
-      document.dispatchEvent(event);
+      isHorizontalSwipe = null;
     };
-    container.addEventListener('touchstart', handleDragStart, { passive: false });
-    container.addEventListener('touchmove', handleDragMove, { passive: true });
+    
+    // Add a click handler to prevent clicks after drag
+    const handleClick = (e) => {
+      // If the user has dragged, prevent the click
+      if (hasMoved) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      
+      // If this is a quick tap (not a long press), allow the click
+      const clickDuration = Date.now() - dragStartTime;
+      if (clickDuration > 300) { // 300ms is a reasonable threshold for a tap
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+    
+    // For better compatibility with different browsers
+    const passiveOptions = { passive: false };
+    const passiveTrue = { passive: true };
+    
+    // Touch events
+    container.addEventListener('touchstart', handleDragStart, passiveTrue);
+    container.addEventListener('touchmove', handleDragMove, passiveOptions);
     container.addEventListener('touchend', handleDragEnd);
+    
+    // Mouse events
     container.addEventListener('mousedown', handleDragStart);
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+    
+    // Add capture phase click handler to handle link clicks
+    container.addEventListener('click', handleClick, true);
+    
     wrapper.style.cursor = 'grab';
-    carouselData.eventHandlers = { handleDragStart, handleDragMove, handleDragEnd };
+    carouselData.eventHandlers = { 
+      handleDragStart, 
+      handleDragMove, 
+      handleDragEnd,
+      handleClick
+    };
   }
 
   _handleResize() {
@@ -866,6 +980,8 @@ class Swipix {
       if (carouselData.isInfinite) {
         this._clearClonedSlides(carouselData);
       }
+      
+      // Reset styles
       container.style.overflow = '';
       container.style.position = '';
       wrapper.style.display = '';
@@ -873,22 +989,29 @@ class Swipix {
       wrapper.style.transform = '';
       wrapper.style.willChange = '';
       wrapper.style.cursor = '';
+      
       slides.forEach(slide => {
         slide.style.flexShrink = '';
         slide.style.width = '';
         slide.style.marginRight = '';
       });
+      
+      // Clean up event listeners
       if (eventHandlers) {
-        container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: false });
-        container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: true });
+        container.removeEventListener('touchstart', eventHandlers.handleDragStart, { passive: true });
+        container.removeEventListener('touchmove', eventHandlers.handleDragMove, { passive: false });
         container.removeEventListener('touchend', eventHandlers.handleDragEnd);
         container.removeEventListener('mousedown', eventHandlers.handleDragStart);
         window.removeEventListener('mousemove', eventHandlers.handleDragMove);
         window.removeEventListener('mouseup', eventHandlers.handleDragEnd);
+        container.removeEventListener('click', eventHandlers.handleClick, true);
       }
+      
+      // Replace with a fresh clone
       const newContainer = container.cloneNode(true);
       container.parentNode.replaceChild(newContainer, container);
     });
+    
     this.state.carousels = [];
   }
 }

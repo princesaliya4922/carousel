@@ -34,7 +34,7 @@ class Swipix {
       infiniteLoop: false,
       speed: 300,
       slidesPerView: { default: 1 },
-      gap: 0,
+      gap: { default: 0 },
       slidesToMove: 1,
       autoplay: { enabled: false, delay: 3000, pauseOnInteraction: false, pauseAfterInteraction: false },
       lazyMedia: false,
@@ -45,6 +45,10 @@ class Swipix {
       dynamicHeightBottomOffset: 0, // New: Additional bottom offset in pixels.
       ...config
     };
+
+    if (typeof this.config.gap === 'number') {
+      this.config.gap = { default: this.config.gap };
+    }
 
     this.state = {
       currentIndex: 0,
@@ -467,6 +471,8 @@ class Swipix {
   _calculateDimensions(carouselData) {
     const { container, slides } = carouselData;
     const viewportWidth = window.innerWidth;
+    
+    // Calculate responsive slidesPerView (existing code)
     let slidesPerView = this.config.slidesPerView.default;
     const breakpoints = Object.keys(this.config.slidesPerView)
       .filter(bp => bp !== 'default')
@@ -479,19 +485,43 @@ class Swipix {
       }
     }
     carouselData.slidesPerView = slidesPerView;
+    
+    // NEW: Calculate responsive gap
+    let gap = this.config.gap.default;
+    const gapBreakpoints = Object.keys(this.config.gap)
+      .filter(bp => bp !== 'default')
+      .map(bp => parseInt(bp, 10))
+      .sort((a, b) => b - a);
+    for (const bp of gapBreakpoints) {
+      if (viewportWidth >= bp) {
+        gap = this.config.gap[bp];
+        break;
+      }
+    }
+    carouselData.gap = gap;
+    
     carouselData.containerWidth = container.offsetWidth;
-    const totalGapSpace = this.config.gap * (slidesPerView - 1);
+    // Use the calculated gap value instead of this.config.gap
+    const totalGapSpace = carouselData.gap * (slidesPerView - 1);
     carouselData.slideWidth = (carouselData.containerWidth - totalGapSpace) / slidesPerView;
     carouselData.totalSlides = carouselData.originalSlides.length;
+    
     slides.forEach(slide => {
       slide.style.width = `${carouselData.slideWidth}px`;
+      // Update margin-right with the calculated gap
+      if (carouselData.gap > 0) {
+        slide.style.marginRight = `${carouselData.gap}px`;
+      } else {
+        slide.style.marginRight = '0px';
+      }
     });
-    carouselData.gap = this.config.gap;
+    
     if (carouselData.isInfinite) {
       this._setupInfiniteLoop(carouselData);
     }
+    
     this._positionSlides(carouselData);
-    // If dynamicHeight is enabled and only one slide is visible, adjust container height.
+    
     if (this.config.dynamicHeight && slidesPerView === 1) {
       this._adjustContainerHeight(carouselData);
     } else {
@@ -923,6 +953,13 @@ class Swipix {
       };
       delete newConfig.autoplay;
     }
+
+    if (newConfig.gap !== undefined) {
+      if (typeof newConfig.gap === 'number') {
+        newConfig.gap = { default: newConfig.gap };
+      }
+    }
+  
     this.config = { ...this.config, ...newConfig };
     this.state.carousels.forEach(carouselData => {
       if (this.config.infiniteLoop !== carouselData.isInfinite) {
